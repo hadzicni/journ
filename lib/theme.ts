@@ -39,7 +39,11 @@ export function setTheme(theme: Theme) {
   ).matches;
   // Cross-fade between themes where View Transitions are supported.
   if (document.startViewTransition && !reduceMotion) {
-    document.startViewTransition(apply);
+    // The browser may skip the transition (e.g. rapid clicks or a hidden
+    // tab); the theme is still applied, so the rejections can be ignored.
+    const transition = document.startViewTransition(apply);
+    transition.ready.catch(() => {});
+    transition.finished.catch(() => {});
   } else {
     apply();
   }
