@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { AnimatePresence, motion, MotionConfig } from "motion/react";
 import {
   CheckIcon,
   CircleAlertIcon,
   CopyIcon,
-  LoaderCircleIcon,
   RotateCcwIcon,
   SparklesIcon,
   SquareIcon,
@@ -14,14 +14,9 @@ import {
 import { JournalEntry } from "@/components/journal-entry";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 
 type GenerationError = { title: string; hint?: string };
 
@@ -89,6 +84,43 @@ async function writeToClipboard(text: string) {
   const ok = document.execCommand("copy");
   textarea.remove();
   if (!ok) throw new Error("Copy command was rejected");
+}
+
+const spring = { type: "spring", bounce: 0, duration: 0.45 } as const;
+
+// Content swaps (button labels, icons) slide and un-blur into place.
+const swap = {
+  initial: { opacity: 0, y: 8, filter: "blur(4px)" },
+  animate: { opacity: 1, y: 0, filter: "blur(0px)" },
+  exit: { opacity: 0, y: -8, filter: "blur(4px)" },
+  transition: spring,
+};
+
+// Smoothly animates its height to fit its children as they grow.
+function AutoHeight({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [height, setHeight] = useState<number | "auto">("auto");
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) =>
+      setHeight(entry.borderBoxSize[0].blockSize)
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <motion.div
+      initial={false}
+      animate={{ height }}
+      transition={{ type: "spring", bounce: 0, duration: 0.6 }}
+      className="overflow-hidden"
+    >
+      <div ref={ref}>{children}</div>
+    </motion.div>
+  );
 }
 
 export function JournalGenerator() {
@@ -189,125 +221,250 @@ export function JournalGenerator() {
     }
   }
 
+
   return (
-    <div className="flex flex-col gap-6">
-      <form
-        className="flex flex-col gap-3"
-        onSubmit={(e) => {
-          e.preventDefault();
-          generate();
-        }}
-      >
-        <label htmlFor="notes" className="sr-only">
-          Notes about your day
-        </label>
-        <Textarea
-          id="notes"
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-              e.preventDefault();
-              generate();
-            }
-          }}
-          placeholder={PLACEHOLDER}
-          className="max-h-96 min-h-40 resize-y p-3 leading-6 md:text-[0.95rem]"
-          autoFocus
-        />
-        <div className="flex items-center justify-between gap-3">
-          <p className="hidden text-xs text-muted-foreground sm:block">
-            <kbd className="font-sans">⌘</kbd> + <kbd className="font-sans">Enter</kbd>{" "}
-            to generate
-          </p>
-          <div className="ml-auto flex gap-2">
-            {notes && !isGenerating && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="lg"
-                onClick={() => setNotes("")}
+    <MotionConfig reducedMotion="user">
+      <div className="flex flex-col gap-6">
+        <motion.div
+          initial={{ opacity: 0, y: 16, filter: "blur(8px)" }}
+          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+          transition={{ ...spring, duration: 0.8, delay: 0.1 }}
+        >
+          <div
+            className="relative rounded-[28px]"
+            data-generating={isGenerating}
+          >
+            <div className="journ-glow" data-blur aria-hidden />
+            <div className="journ-glow" aria-hidden />
+            <Card className="relative gap-0 rounded-[inherit] py-0 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_12px_40px_-16px_rgb(0_0_0/0.18)] ring-black/[0.06] transition-shadow duration-300 focus-within:shadow-[0_1px_2px_rgb(0_0_0/0.04),0_16px_48px_-16px_rgb(0_0_0/0.24)] dark:ring-white/10">
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (isGenerating) stop();
+                  else generate();
+                }}
               >
-                Clear
-              </Button>
-            )}
-            {isGenerating ? (
-              <Button type="button" variant="outline" size="lg" onClick={stop}>
-                <SquareIcon data-icon="inline-start" className="fill-current" />
-                Stop
-              </Button>
-            ) : (
-              <Button type="submit" size="lg" disabled={!canGenerate}>
-                <SparklesIcon data-icon="inline-start" />
-                Generate
-              </Button>
-            )}
-          </div>
-        </div>
-      </form>
-
-      {error && (
-        <Alert variant="destructive">
-          <CircleAlertIcon />
-          <AlertTitle>{error.title}</AlertTitle>
-          {error.hint && <AlertDescription>{error.hint}</AlertDescription>}
-        </Alert>
-      )}
-
-      {(isGenerating || entry) && (
-        <Card aria-busy={isGenerating}>
-          <CardHeader className="border-b">
-            <CardTitle className="flex items-center gap-2 text-sm text-muted-foreground">
-              {isGenerating && !entry ? (
-                <>
-                  <LoaderCircleIcon className="size-4 animate-spin" />
-                  Writing your entry…
-                </>
-              ) : (
-                "Journal entry"
-              )}
-            </CardTitle>
-            {entry && (
-              <CardAction className="flex gap-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={generate}
-                  disabled={!canGenerate}
-                >
-                  <RotateCcwIcon data-icon="inline-start" />
-                  Regenerate
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={copy}
-                  disabled={isGenerating}
-                  aria-live="polite"
-                >
-                  {copied ? (
-                    <CheckIcon data-icon="inline-start" />
-                  ) : (
-                    <CopyIcon data-icon="inline-start" />
+                <label htmlFor="notes" className="sr-only">
+                  Notes about your day
+                </label>
+                <Textarea
+                  id="notes"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                      e.preventDefault();
+                      generate();
+                    }
+                  }}
+                  readOnly={isGenerating}
+                  placeholder={PLACEHOLDER}
+                  className={cn(
+                    "max-h-[28rem] min-h-40 resize-none rounded-none border-0 bg-transparent px-6 pt-5 pb-2 text-[1.0625rem] leading-7 shadow-none transition-opacity duration-500 placeholder:text-muted-foreground/60 focus-visible:ring-0 md:text-[1.0625rem] dark:bg-transparent",
+                    isGenerating && "opacity-40"
                   )}
-                  {copied ? "Copied" : "Copy"}
-                </Button>
-              </CardAction>
-            )}
-          </CardHeader>
-          <CardContent className="py-2">
-            {entry ? (
-              <JournalEntry markdown={entry} />
-            ) : (
-              <div className="space-y-3 py-2" aria-hidden>
-                <div className="h-5 w-2/5 animate-pulse rounded bg-muted" />
-                <div className="h-4 w-full animate-pulse rounded bg-muted" />
-                <div className="h-4 w-4/5 animate-pulse rounded bg-muted" />
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-    </div>
+                  autoFocus
+                />
+                <div className="flex items-center gap-2 px-3 pt-1 pb-3 pl-6">
+                  <p className="hidden items-center gap-1 text-xs text-muted-foreground/80 sm:flex">
+                    <kbd className="rounded-md bg-muted px-1.5 py-0.5 font-sans">
+                      ⌘
+                    </kbd>
+                    <kbd className="rounded-md bg-muted px-1.5 py-0.5 font-sans">
+                      ↵
+                    </kbd>
+                    <span className="ml-1">to generate</span>
+                  </p>
+                  <div className="ml-auto flex items-center gap-1.5">
+                    <AnimatePresence initial={false}>
+                      {notes && !isGenerating && (
+                        <motion.div
+                          key="clear"
+                          initial={{ opacity: 0, scale: 0.9 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.9 }}
+                          transition={spring}
+                        >
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="lg"
+                            className="h-10 rounded-full px-4 text-muted-foreground"
+                            onClick={() => setNotes("")}
+                          >
+                            Clear
+                          </Button>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                    <Button
+                      type="submit"
+                      size="lg"
+                      disabled={!isGenerating && !notes.trim()}
+                      className="relative h-10 min-w-30 overflow-hidden rounded-full px-5 text-[0.9375rem] transition-[scale,opacity,background-color] duration-200 active:scale-[0.96]"
+                    >
+                      <AnimatePresence mode="popLayout" initial={false}>
+                        <motion.span
+                          key={isGenerating ? "stop" : "generate"}
+                          {...swap}
+                          className="flex items-center gap-2"
+                        >
+                          {isGenerating ? (
+                            <>
+                              <SquareIcon className="size-3 fill-current" />
+                              Stop
+                            </>
+                          ) : (
+                            <>
+                              <SparklesIcon />
+                              Generate
+                            </>
+                          )}
+                        </motion.span>
+                      </AnimatePresence>
+                    </Button>
+                  </div>
+                </div>
+              </form>
+            </Card>
+          </div>
+        </motion.div>
+
+        <AnimatePresence>
+          {error && (
+            <motion.div
+              key="error"
+              initial={{ opacity: 0, y: -8, filter: "blur(4px)" }}
+              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+              exit={{ opacity: 0, y: -8, filter: "blur(4px)" }}
+              transition={spring}
+            >
+              <Alert
+                variant="destructive"
+                className="rounded-2xl border-destructive/20 bg-destructive/[0.06] px-4 py-3"
+              >
+                <CircleAlertIcon />
+                <AlertTitle>{error.title}</AlertTitle>
+                {error.hint && (
+                  <AlertDescription>{error.hint}</AlertDescription>
+                )}
+              </Alert>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {(isGenerating || entry) && (
+            <motion.div
+              key="result"
+              initial={{ opacity: 0, y: 24, scale: 0.98, filter: "blur(10px)" }}
+              animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
+              exit={{ opacity: 0, y: 12, scale: 0.98, filter: "blur(6px)" }}
+              transition={{ type: "spring", bounce: 0.15, duration: 0.7 }}
+            >
+              <Card
+                aria-busy={isGenerating}
+                className="gap-0 rounded-[28px] py-0 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_12px_40px_-16px_rgb(0_0_0/0.18)] ring-black/[0.06] dark:ring-white/10"
+              >
+                <div className="flex min-h-14 items-center justify-between gap-3 px-6 pt-4">
+                  <AnimatePresence mode="popLayout" initial={false}>
+                    <motion.span
+                      key={isGenerating ? "writing" : "done"}
+                      {...swap}
+                      className={cn(
+                        "text-sm font-medium whitespace-nowrap",
+                        isGenerating
+                          ? "journ-shimmer"
+                          : "text-muted-foreground"
+                      )}
+                    >
+                      {isGenerating ? "Writing your entry…" : "Journal entry"}
+                    </motion.span>
+                  </AnimatePresence>
+
+                  <AnimatePresence>
+                    {!isGenerating && entry && (
+                      <motion.div
+                        key="actions"
+                        initial={{ opacity: 0, x: 8, filter: "blur(4px)" }}
+                        animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
+                        exit={{ opacity: 0, x: 8, filter: "blur(4px)" }}
+                        transition={{ ...spring, delay: 0.15 }}
+                        className="flex items-center gap-1"
+                      >
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 rounded-full px-3 text-muted-foreground active:scale-[0.96]"
+                          onClick={generate}
+                          disabled={!canGenerate}
+                        >
+                          <RotateCcwIcon data-icon="inline-start" />
+                          Regenerate
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="h-8 min-w-22 overflow-hidden rounded-full px-3 active:scale-[0.96]"
+                          onClick={copy}
+                          aria-live="polite"
+                        >
+                          <AnimatePresence mode="popLayout" initial={false}>
+                            <motion.span
+                              key={copied ? "copied" : "copy"}
+                              initial={{ opacity: 0, scale: 0.6, filter: "blur(4px)" }}
+                              animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+                              exit={{ opacity: 0, scale: 0.6, filter: "blur(4px)" }}
+                              transition={{ type: "spring", bounce: 0.35, duration: 0.4 }}
+                              className="flex items-center gap-1.5"
+                            >
+                              {copied ? (
+                                <CheckIcon className="size-3.5 text-green-600 dark:text-green-500" />
+                              ) : (
+                                <CopyIcon className="size-3.5" />
+                              )}
+                              {copied ? "Copied" : "Copy"}
+                            </motion.span>
+                          </AnimatePresence>
+                        </Button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+
+                <AutoHeight>
+                  <div className="px-6 pt-3 pb-7">
+                    <AnimatePresence mode="popLayout" initial={false}>
+                      {entry ? (
+                        <motion.div
+                          key="entry"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                        >
+                          <JournalEntry markdown={entry} />
+                        </motion.div>
+                      ) : (
+                        <motion.div
+                          key="skeleton"
+                          className="space-y-3.5 py-1"
+                          exit={{ opacity: 0, filter: "blur(4px)" }}
+                          transition={spring}
+                          aria-hidden
+                        >
+                          <div className="journ-skeleton h-6 w-2/5 rounded-full" />
+                          <div className="journ-skeleton h-4 w-full rounded-full" />
+                          <div className="journ-skeleton h-4 w-11/12 rounded-full" />
+                          <div className="journ-skeleton h-4 w-3/5 rounded-full" />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </AutoHeight>
+              </Card>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </MotionConfig>
   );
 }
