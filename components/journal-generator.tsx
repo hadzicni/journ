@@ -124,7 +124,7 @@ function AutoHeight({ children }: { children: ReactNode }) {
   );
 }
 
-export function JournalGenerator({ model }: { model: string }) {
+export function JournalGenerator({ model }: { model?: string }) {
   const [notes, setNotes] = useState("");
   const [output, setOutput] = useState("");
   const [date, setDate] = useState("");
@@ -269,11 +269,13 @@ export function JournalGenerator({ model }: { model: string }) {
                 <div className="flex items-center gap-3 px-3 pt-1 pb-3 pl-5">
                   <span
                     className="flex min-w-0 items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground"
-                    title={`Model: ${model}`}
+                    title={model ? `Model: ${model}` : "OLLAMA_MODEL is not set"}
                   >
                     <CpuIcon className="size-3.5 shrink-0" aria-hidden />
                     <span className="sr-only">Model:</span>
-                    <span className="truncate font-mono">{model}</span>
+                    <span className="truncate font-mono">
+                      {model ?? "no model set"}
+                    </span>
                   </span>
                   <p className="hidden items-center gap-1 text-xs text-muted-foreground/80 md:flex">
                     <kbd className="rounded-md bg-muted px-1.5 py-0.5 font-sans">

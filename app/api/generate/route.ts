@@ -1,4 +1,3 @@
-import { getOllamaConfig } from "@/lib/ollama";
 import { EXAMPLE_ENTRY, EXAMPLE_NOTES, SYSTEM_PROMPT } from "@/lib/prompt";
 
 const MAX_NOTES_LENGTH = 10_000;
@@ -8,7 +7,21 @@ function errorResponse(status: number, error: string, hint?: string) {
 }
 
 export async function POST(request: Request) {
-  const { url: ollamaUrl, model } = getOllamaConfig();
+  // Configured in .env.local (see .env.example).
+  const ollamaUrl = process.env.OLLAMA_URL?.replace(/\/+$/, "");
+  const model = process.env.OLLAMA_MODEL;
+  const apiKey = process.env.OLLAMA_API_KEY;
+
+  if (!ollamaUrl || !model) {
+    return errorResponse(
+      500,
+      "Ollama isn't configured.",
+      "Set OLLAMA_URL and OLLAMA_MODEL in your .env.local (see .env.example), then try again."
+    );
+  }
+  const isLocal = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(
+    ollamaUrl
+  );
 
   let notes: unknown;
   try {
@@ -31,7 +44,10 @@ export async function POST(request: Request) {
   try {
     upstream = await fetch(`${ollamaUrl}/api/chat`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(apiKey && { Authorization: `Bearer ${apiKey}` }),
+      },
       body: JSON.stringify({
         model,
         stream: true,
@@ -51,7 +67,9 @@ export async function POST(request: Request) {
     return errorResponse(
       503,
       `Can't reach Ollama at ${ollamaUrl}.`,
-      "Make sure Ollama is running (open the Ollama app or run 'ollama serve'), then try again."
+      isLocal
+        ? "Make sure Ollama is running (open the Ollama app or run 'ollama serve'), then try again."
+        : "Check OLLAMA_URL in your .env.local and your network connection, then try again."
     );
   }
 
@@ -61,11 +79,24 @@ export async function POST(request: Request) {
       .then((body: { error?: string }) => body.error)
       .catch(() => undefined);
 
+    if (upstream.status === 401 || upstream.status === 403) {
+      return errorResponse(
+        502,
+        apiKey
+          ? `Ollama rejected the API key (${upstream.status}).`
+          : `Ollama at ${ollamaUrl} requires an API key.`,
+        apiKey
+          ? "Check OLLAMA_API_KEY in your .env.local, then try again."
+          : "Set OLLAMA_API_KEY in your .env.local, then try again."
+      );
+    }
     if (upstream.status === 404) {
       return errorResponse(
         502,
         `The model "${model}" isn't available in Ollama.`,
-        `Pull it with "ollama pull ${model}", then try again.`
+        isLocal
+          ? `Pull it with "ollama pull ${model}", then try again.`
+          : "Check that OLLAMA_MODEL in your .env.local names a model available on this server."
       );
     }
     return errorResponse(

@@ -2,12 +2,11 @@ import { connection } from "next/server";
 
 import { JournalGenerator } from "@/components/journal-generator";
 import { TodayLabel } from "@/components/today-label";
-import { getOllamaConfig } from "@/lib/ollama";
 
 export default async function Home() {
   // Render per request so the model shown matches the current OLLAMA_MODEL.
   await connection();
-  const { model } = getOllamaConfig();
+  const model = process.env.OLLAMA_MODEL;
 
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-10 px-4 py-14 sm:py-24">
