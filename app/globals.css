@@ -188,42 +188,90 @@
   }
 }
 
-/* Words fade in out of a soft blur as the model streams them. */
+/* Words fly in: out of a heavy blur, tinted blue → purple → pink, then settle. */
 .journ-word {
-  animation: journ-word-in 650ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  display: inline-block;
+  animation: journ-word-in 900ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
 @keyframes journ-word-in {
-  from {
+  0% {
     opacity: 0;
-    filter: blur(6px);
+    filter: blur(12px);
+    transform: translateY(0.55em) scale(0.7) rotate(-6deg);
+    color: #0a84ff;
+  }
+  30% {
+    opacity: 1;
+    filter: blur(1px);
+    color: #bf5af2;
+    text-shadow: 0 0 14px rgb(191 90 242 / 0.9);
+  }
+  60% {
+    transform: translateY(-0.06em) scale(1.06);
+    color: #ff375f;
+    text-shadow: 0 0 10px rgb(255 55 95 / 0.6);
   }
 }
 
-/* Light sweeping across text, like "Writing…" in iOS. */
+/* Glowing orb that rides along at the end of the streaming text. */
+.journ-caret {
+  display: inline-block;
+  width: 0.62em;
+  height: 0.62em;
+  margin-left: 0.3em;
+  vertical-align: -0.02em;
+  border-radius: 999px;
+  background: conic-gradient(
+    from var(--journ-angle),
+    #0a84ff,
+    #bf5af2,
+    #ff375f,
+    #ff9f0a,
+    #0a84ff
+  );
+  box-shadow:
+    0 0 12px rgb(191 90 242 / 0.9),
+    0 0 28px rgb(10 132 255 / 0.6);
+  animation:
+    journ-orbit 1.2s linear infinite,
+    journ-caret-pulse 900ms ease-in-out infinite;
+}
+
+@keyframes journ-caret-pulse {
+  50% {
+    transform: scale(1.35);
+  }
+}
+
+/* Rainbow light sweeping across text, like "Writing…" in iOS. */
 .journ-shimmer {
   background: linear-gradient(
       100deg,
-      var(--muted-foreground) 35%,
-      var(--foreground) 50%,
-      var(--muted-foreground) 65%
+      var(--muted-foreground) 25%,
+      #0a84ff 40%,
+      #bf5af2 50%,
+      #ff375f 60%,
+      var(--muted-foreground) 75%
     )
     0 0 / 250% 100%;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  animation: journ-sweep 2.2s linear infinite;
+  animation: journ-sweep 1.8s linear infinite;
 }
 
 .journ-skeleton {
   background: linear-gradient(
       100deg,
-      var(--muted) 30%,
-      color-mix(in oklch, var(--muted), var(--foreground) 6%) 50%,
-      var(--muted) 70%
+      var(--muted) 25%,
+      color-mix(in oklch, var(--muted), #0a84ff 22%) 42%,
+      color-mix(in oklch, var(--muted), #bf5af2 28%) 50%,
+      color-mix(in oklch, var(--muted), #ff375f 22%) 58%,
+      var(--muted) 75%
     )
     0 0 / 250% 100%;
-  animation: journ-sweep 1.8s linear infinite;
+  animation: journ-sweep 1.6s linear infinite;
 }
 
 @keyframes journ-sweep {
@@ -235,12 +283,94 @@
   }
 }
 
+/* ---------- Page background, driven by <html data-generating> ---------- */
+
+/* Slow aurora of color behind everything; it wakes up while writing. */
+.journ-aurora {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0.22;
+  scale: 1;
+  transition:
+    opacity 1.2s ease,
+    scale 1.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.journ-aurora > div {
+  position: absolute;
+  inset: -25%;
+  animation: journ-aurora-spin 48s linear infinite;
+}
+
+.journ-aurora span {
+  position: absolute;
+  width: 60vmax;
+  height: 60vmax;
+  border-radius: 50%;
+  animation: journ-drift 18s ease-in-out infinite alternate;
+}
+
+.journ-aurora span:nth-child(1) {
+  top: 5%;
+  left: 5%;
+  background: radial-gradient(circle, #0a84ff 0%, transparent 62%);
+}
+
+.journ-aurora span:nth-child(2) {
+  top: 15%;
+  right: 0;
+  background: radial-gradient(circle, #bf5af2 0%, transparent 62%);
+  animation-duration: 23s;
+  animation-delay: -7s;
+}
+
+.journ-aurora span:nth-child(3) {
+  bottom: 0;
+  left: 25%;
+  background: radial-gradient(circle, #ff375f 0%, transparent 62%);
+  animation-duration: 27s;
+  animation-delay: -13s;
+}
+
+@keyframes journ-aurora-spin {
+  to {
+    rotate: 360deg;
+  }
+}
+
+@keyframes journ-drift {
+  to {
+    translate: 12vmax -8vmax;
+    scale: 1.25;
+  }
+}
+
+html[data-generating="true"] .journ-aurora {
+  opacity: 0.5;
+  scale: 1.15;
+}
+
+@media (prefers-color-scheme: dark) {
+  .journ-aurora {
+    opacity: 0.3;
+  }
+  html[data-generating="true"] .journ-aurora {
+    opacity: 0.65;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .journ-glow,
   .journ-glow[data-blur],
   .journ-word,
+  .journ-caret,
   .journ-shimmer,
-  .journ-skeleton {
+  .journ-skeleton,
+  .journ-aurora > div,
+  .journ-aurora span {
     animation: none;
   }
 }

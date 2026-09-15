@@ -142,6 +142,15 @@ export function JournalGenerator({ model }: { model?: string }) {
     []
   );
 
+  // The page background aurora keys off this attribute.
+  useEffect(() => {
+    const root = document.documentElement;
+    root.dataset.generating = String(isGenerating);
+    return () => {
+      delete root.dataset.generating;
+    };
+  }, [isGenerating]);
+
   const body = cleanEntry(output);
   const entry = body ? `# ${date}\n\n${body}` : "";
   const canGenerate = notes.trim().length > 0 && !isGenerating;
@@ -221,7 +230,6 @@ export function JournalGenerator({ model }: { model?: string }) {
       });
     }
   }
-
 
   return (
     <MotionConfig reducedMotion="user">
@@ -368,10 +376,29 @@ export function JournalGenerator({ model }: { model?: string }) {
           {(isGenerating || entry) && (
             <motion.div
               key="result"
-              initial={{ opacity: 0, y: 24, scale: 0.98, filter: "blur(10px)" }}
-              animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
-              exit={{ opacity: 0, y: 12, scale: 0.98, filter: "blur(6px)" }}
-              transition={{ type: "spring", bounce: 0.15, duration: 0.7 }}
+              style={{ transformPerspective: 1200, transformOrigin: "50% 0%" }}
+              initial={{
+                opacity: 0,
+                y: 80,
+                rotateX: 35,
+                scale: 0.85,
+                filter: "blur(20px)",
+              }}
+              animate={{
+                opacity: 1,
+                y: 0,
+                rotateX: 0,
+                scale: 1,
+                filter: "blur(0px)",
+              }}
+              exit={{
+                opacity: 0,
+                y: 40,
+                rotateX: -20,
+                scale: 0.9,
+                filter: "blur(12px)",
+              }}
+              transition={{ type: "spring", bounce: 0.35, duration: 0.9 }}
             >
               <Card
                 aria-busy={isGenerating}
@@ -452,7 +479,10 @@ export function JournalGenerator({ model }: { model?: string }) {
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
                         >
-                          <JournalEntry markdown={entry} />
+                          <JournalEntry
+                            markdown={entry}
+                            streaming={isGenerating}
+                          />
                         </motion.div>
                       ) : (
                         <motion.div

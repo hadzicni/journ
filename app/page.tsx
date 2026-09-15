@@ -10,6 +10,13 @@ export default async function Home() {
 
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-10 px-4 py-14 sm:py-24">
+      <div className="journ-aurora" aria-hidden>
+        <div>
+          <span />
+          <span />
+          <span />
+        </div>
+      </div>
       <header className="flex flex-col gap-2 px-2 animate-in duration-700 fill-mode-both fade-in blur-in slide-in-from-bottom-3">
         <p className="text-[0.8rem] font-semibold tracking-wide text-muted-foreground uppercase">
           <TodayLabel />

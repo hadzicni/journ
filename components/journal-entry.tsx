@@ -10,8 +10,11 @@ type HastNode = {
 
 // Wraps every word in its own span. React keeps already-rendered spans
 // mounted while the text streams in, so only newly arrived words play the
-// fade-in animation.
-function rehypeWords() {
+// fly-in animation. While streaming, a glowing caret follows the last word.
+function rehypeWords({ caret }: { caret: boolean }) {
+  // The most recent element that received words; the caret goes there.
+  const state: { lastParent?: HastNode } = {};
+
   const wrap = (node: HastNode) => {
     if (!node.children) return;
     node.children = node.children.flatMap((child) => {
@@ -19,6 +22,7 @@ function rehypeWords() {
         wrap(child);
         return [child];
       }
+      if (child.value.trim()) state.lastParent = node;
       return child.value
         .split(/(\s+)/)
         .filter(Boolean)
@@ -34,10 +38,21 @@ function rehypeWords() {
         );
     });
   };
-  return wrap;
-}
 
-const rehypePlugins = [rehypeWords];
+  return (tree: HastNode) => {
+    wrap(tree);
+    // An <i> keeps the caret out of the word spans' key sequence, so words
+    // arriving where the caret was still mount fresh and animate.
+    if (caret && state.lastParent?.children) {
+      state.lastParent.children.push({
+        type: "element",
+        tagName: "i",
+        properties: { className: ["journ-caret"], ariaHidden: "true" },
+        children: [],
+      });
+    }
+  };
+}
 
 const components: Components = {
   h1: ({ children }) => (
@@ -82,10 +97,19 @@ const components: Components = {
   hr: () => <hr className="my-5" />,
 };
 
-export function JournalEntry({ markdown }: { markdown: string }) {
+export function JournalEntry({
+  markdown,
+  streaming = false,
+}: {
+  markdown: string;
+  streaming?: boolean;
+}) {
   return (
     <div className="text-[0.975rem] text-card-foreground">
-      <Markdown components={components} rehypePlugins={rehypePlugins}>
+      <Markdown
+        components={components}
+        rehypePlugins={[[rehypeWords, { caret: streaming }]]}
+      >
         {markdown}
       </Markdown>
     </div>
