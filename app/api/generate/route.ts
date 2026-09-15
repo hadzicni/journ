@@ -1,7 +1,6 @@
+import { getOllamaConfig } from "@/lib/ollama";
 import { EXAMPLE_ENTRY, EXAMPLE_NOTES, SYSTEM_PROMPT } from "@/lib/prompt";
 
-const OLLAMA_URL = process.env.OLLAMA_URL ?? "http://localhost:11434";
-const MODEL = process.env.OLLAMA_MODEL ?? "llama3.2:3b";
 const MAX_NOTES_LENGTH = 10_000;
 
 function errorResponse(status: number, error: string, hint?: string) {
@@ -9,6 +8,8 @@ function errorResponse(status: number, error: string, hint?: string) {
 }
 
 export async function POST(request: Request) {
+  const { url: ollamaUrl, model } = getOllamaConfig();
+
   let notes: unknown;
   try {
     ({ notes } = await request.json());
@@ -28,11 +29,11 @@ export async function POST(request: Request) {
 
   let upstream: Response;
   try {
-    upstream = await fetch(`${OLLAMA_URL}/api/chat`, {
+    upstream = await fetch(`${ollamaUrl}/api/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: MODEL,
+        model,
         stream: true,
         options: { temperature: 0.3 },
         messages: [
@@ -49,7 +50,7 @@ export async function POST(request: Request) {
     console.error("Ollama request failed:", err);
     return errorResponse(
       503,
-      `Can't reach Ollama at ${OLLAMA_URL}.`,
+      `Can't reach Ollama at ${ollamaUrl}.`,
       "Make sure Ollama is running (open the Ollama app or run 'ollama serve'), then try again."
     );
   }
@@ -63,8 +64,8 @@ export async function POST(request: Request) {
     if (upstream.status === 404) {
       return errorResponse(
         502,
-        `The model "${MODEL}" isn't available in Ollama.`,
-        `Pull it with "ollama pull ${MODEL}", then try again.`
+        `The model "${model}" isn't available in Ollama.`,
+        `Pull it with "ollama pull ${model}", then try again.`
       );
     }
     return errorResponse(

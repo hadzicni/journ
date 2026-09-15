@@ -1,7 +1,14 @@
+import { connection } from "next/server";
+
 import { JournalGenerator } from "@/components/journal-generator";
 import { TodayLabel } from "@/components/today-label";
+import { getOllamaConfig } from "@/lib/ollama";
 
-export default function Home() {
+export default async function Home() {
+  // Render per request so the model shown matches the current OLLAMA_MODEL.
+  await connection();
+  const { model } = getOllamaConfig();
+
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-10 px-4 py-14 sm:py-24">
       <header className="flex flex-col gap-2 px-2 animate-in duration-700 fill-mode-both fade-in blur-in slide-in-from-bottom-3">
@@ -16,7 +23,7 @@ export default function Home() {
           into a clean journal entry. Nothing is saved.
         </p>
       </header>
-      <JournalGenerator />
+      <JournalGenerator model={model} />
     </main>
   );
 }
