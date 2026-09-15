@@ -237,7 +237,7 @@ export function JournalGenerator({ model }: { model?: string }) {
           >
             <div className="journ-glow" data-blur aria-hidden />
             <div className="journ-glow" aria-hidden />
-            <Card className="relative gap-0 rounded-[inherit] py-0 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_12px_40px_-16px_rgb(0_0_0/0.18)] ring-black/[0.06] transition-shadow duration-300 focus-within:shadow-[0_1px_2px_rgb(0_0_0/0.04),0_16px_48px_-16px_rgb(0_0_0/0.24)] dark:ring-white/10">
+            <Card className="relative gap-0 rounded-[inherit] py-0 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_12px_40px_-16px_rgb(0_0_0/0.18)] ring-black/6 transition-shadow duration-300 focus-within:shadow-[0_1px_2px_rgb(0_0_0/0.04),0_16px_48px_-16px_rgb(0_0_0/0.24)] dark:ring-white/10">
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -261,7 +261,7 @@ export function JournalGenerator({ model }: { model?: string }) {
                   readOnly={isGenerating}
                   placeholder={PLACEHOLDER}
                   className={cn(
-                    "max-h-[28rem] min-h-40 resize-none rounded-none border-0 bg-transparent px-6 pt-5 pb-2 text-[1.0625rem] leading-7 shadow-none transition-opacity duration-500 placeholder:text-muted-foreground/60 focus-visible:ring-0 md:text-[1.0625rem] dark:bg-transparent",
+                    "max-h-112 min-h-40 resize-none rounded-none border-0 bg-transparent px-6 pt-5 pb-2 text-[1.0625rem] leading-7 shadow-none transition-opacity duration-500 placeholder:text-muted-foreground/60 focus-visible:ring-0 md:text-[1.0625rem] dark:bg-transparent",
                     isGenerating && "opacity-40"
                   )}
                   autoFocus
@@ -352,7 +352,7 @@ export function JournalGenerator({ model }: { model?: string }) {
             >
               <Alert
                 variant="destructive"
-                className="rounded-2xl border-destructive/20 bg-destructive/[0.06] px-4 py-3"
+                className="rounded-2xl border-destructive/20 bg-destructive/6 px-4 py-3"
               >
                 <CircleAlertIcon />
                 <AlertTitle>{error.title}</AlertTitle>
@@ -375,7 +375,7 @@ export function JournalGenerator({ model }: { model?: string }) {
             >
               <Card
                 aria-busy={isGenerating}
-                className="gap-0 rounded-[28px] py-0 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_12px_40px_-16px_rgb(0_0_0/0.18)] ring-black/[0.06] dark:ring-white/10"
+                className="gap-0 rounded-[28px] py-0 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_12px_40px_-16px_rgb(0_0_0/0.18)] ring-black/6 dark:ring-white/10"
               >
                 <div className="flex min-h-14 items-center justify-between gap-3 px-6 pt-4">
                   <AnimatePresence mode="popLayout" initial={false}>

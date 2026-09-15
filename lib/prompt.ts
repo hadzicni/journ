@@ -8,6 +8,8 @@ Rules:
 - Fix spelling, grammar, and shorthand, but do not change the meaning.
 - If something in the notes is unclear, keep it close to the original wording rather than guessing.
 - Output only the entry in Markdown. No preamble, no closing remarks, no title, no date.
+- Do not repeat the same detail in both the Summary and What I did — the summary should be a higher-level synthesis, not a restatement.
+- End the output immediately after the last relevant section. Do not add any text after it.
 
 Use this structure:
 
@@ -19,7 +21,7 @@ One or two sentences summarizing the day.
 
 ## Thoughts
 - Feelings, reflections, or ideas from the notes. Omit this section entirely if there are none.
-
+s
 ## Next up
 - Plans, to-dos, or follow-ups from the notes. Omit this section entirely if there are none.`;
 
