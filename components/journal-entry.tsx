@@ -11,7 +11,7 @@ type HastNode = {
 // Wraps every word in its own span. React keeps already-rendered spans
 // mounted while the text streams in, so only newly arrived words play the
 // fly-in animation. While streaming, a glowing caret follows the last word.
-function rehypeWords({ caret }: { caret: boolean }) {
+function rehypeWords({ animate, caret }: { animate: boolean; caret: boolean }) {
   // The most recent element that received words; the caret goes there.
   const state: { lastParent?: HastNode } = {};
 
@@ -32,7 +32,7 @@ function rehypeWords({ caret }: { caret: boolean }) {
             : {
                 type: "element",
                 tagName: "span",
-                properties: { className: ["journ-word"] },
+                properties: { className: animate ? ["journ-word"] : [] },
                 children: [{ type: "text", value: part }],
               }
         );
@@ -100,15 +100,17 @@ const components: Components = {
 export function JournalEntry({
   markdown,
   streaming = false,
+  animate = true,
 }: {
   markdown: string;
   streaming?: boolean;
+  animate?: boolean;
 }) {
   return (
     <div className="text-[0.975rem] text-card-foreground">
       <Markdown
         components={components}
-        rehypePlugins={[[rehypeWords, { caret: streaming }]]}
+        rehypePlugins={[[rehypeWords, { animate, caret: streaming }]]}
       >
         {markdown}
       </Markdown>

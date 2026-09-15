@@ -1,6 +1,13 @@
-import { EXAMPLE_ENTRY, EXAMPLE_NOTES, SYSTEM_PROMPT } from "@/lib/prompt";
+import type { EntryOptions } from "@/lib/entry";
+import {
+  buildSystemPrompt,
+  entrySchema,
+  EXAMPLE_NOTES,
+  exampleEntry,
+} from "@/lib/prompt";
 
 const MAX_NOTES_LENGTH = 10_000;
+const MODEL_NAME = /^[\w.:/@+-]{1,200}$/;
 
 function errorResponse(status: number, error: string, hint?: string) {
   return Response.json({ error, hint }, { status });
@@ -9,25 +16,47 @@ function errorResponse(status: number, error: string, hint?: string) {
 export async function POST(request: Request) {
   // Configured in .env.local (see .env.example).
   const ollamaUrl = process.env.OLLAMA_URL?.replace(/\/+$/, "");
-  const model = process.env.OLLAMA_MODEL;
   const apiKey = process.env.OLLAMA_API_KEY;
 
-  if (!ollamaUrl || !model) {
+  if (!ollamaUrl) {
     return errorResponse(
       500,
       "Ollama isn't configured.",
-      "Set OLLAMA_URL and OLLAMA_MODEL in your .env.local (see .env.example), then try again."
+      "Set OLLAMA_URL in your .env.local (see .env.example), then try again."
     );
   }
   const isLocal = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(
     ollamaUrl
   );
 
-  let notes: unknown;
+  let body: Record<string, unknown>;
   try {
-    ({ notes } = await request.json());
+    body = await request.json();
   } catch {
     return errorResponse(400, "Invalid request body.");
+  }
+
+  const { notes } = body;
+  // The model picked in the UI, falling back to OLLAMA_MODEL.
+  const model =
+    typeof body.model === "string" && body.model
+      ? body.model
+      : process.env.OLLAMA_MODEL;
+  const options: EntryOptions = {
+    format: body.format === "prose" ? "prose" : "bullets",
+    length: body.length === "detailed" ? "detailed" : "concise",
+    matchLanguage: body.matchLanguage !== false,
+  };
+
+  if (!model) {
+    return errorResponse(
+      400,
+      "No model selected.",
+      "Pick a model, or set OLLAMA_MODEL in your .env.local."
+    );
+  }
+  if (!MODEL_NAME.test(model)) {
+    return errorResponse(400, "Invalid model name.");
   }
 
   if (typeof notes !== "string" || !notes.trim()) {
@@ -51,11 +80,12 @@ export async function POST(request: Request) {
       body: JSON.stringify({
         model,
         stream: true,
+        format: entrySchema(options),
         options: { temperature: 0.3 },
         messages: [
-          { role: "system", content: SYSTEM_PROMPT },
+          { role: "system", content: buildSystemPrompt(options) },
           { role: "user", content: `My notes for today:\n\n${EXAMPLE_NOTES}` },
-          { role: "assistant", content: EXAMPLE_ENTRY },
+          { role: "assistant", content: exampleEntry(options) },
           { role: "user", content: `My notes for today:\n\n${notes.trim()}` },
         ],
       }),
@@ -95,8 +125,8 @@ export async function POST(request: Request) {
         502,
         `The model "${model}" isn't available in Ollama.`,
         isLocal
-          ? `Pull it with "ollama pull ${model}", then try again.`
-          : "Check that OLLAMA_MODEL in your .env.local names a model available on this server."
+          ? `Pull it with "ollama pull ${model}", or pick another model.`
+          : "Pick another model that's available on this server."
       );
     }
     return errorResponse(
@@ -110,7 +140,8 @@ export async function POST(request: Request) {
     return errorResponse(502, "Ollama returned an empty response.");
   }
 
-  // Ollama streams newline-delimited JSON; forward only the generated text.
+  // Ollama streams newline-delimited JSON chunks; forward only the generated
+  // text, which is itself the entry's JSON as it's being written.
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
   let buffer = "";

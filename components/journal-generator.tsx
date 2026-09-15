@@ -6,17 +6,30 @@ import {
   CheckIcon,
   CircleAlertIcon,
   CopyIcon,
-  CpuIcon,
+  LanguagesIcon,
+  PencilIcon,
   RotateCcwIcon,
   SparklesIcon,
   SquareIcon,
+  Undo2Icon,
 } from "lucide-react";
 
 import { JournalEntry } from "@/components/journal-entry";
+import { ModelSelect, useOllamaModels } from "@/components/model-select";
+import { SegmentedControl } from "@/components/segmented-control";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  entryToMarkdown,
+  hasContent,
+  parsePartialJson,
+  toEntryData,
+  type EntryFormat,
+  type EntryLength,
+} from "@/lib/entry";
 import { cn } from "@/lib/utils";
 
 type GenerationError = { title: string; hint?: string };
@@ -27,45 +40,15 @@ afternoon mostly code review, 3 PRs
 felt kinda tired but productive
 tmrw: finish the migration script`;
 
-function formatToday() {
-  return new Date().toLocaleDateString("en-US", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-}
+const LENGTH_OPTIONS: { value: EntryLength; label: string }[] = [
+  { value: "concise", label: "Concise" },
+  { value: "detailed", label: "Detailed" },
+];
 
-const EMPTY_BULLET = /^\s*[-*]\s*$/;
-
-// Small models don't always follow the format exactly, so tidy the output:
-// drop a chatty preamble ("Here is your journal entry:"), empty bullets,
-// sections the model left empty, and normalize "*" bullets to "-".
-function cleanEntry(text: string) {
-  const firstHeading = text.search(/^## /m);
-  if (firstHeading > 0) {
-    const preamble = text.slice(0, firstHeading);
-    if (preamble.length < 200 && !/^\s*[-*]\s/m.test(preamble)) {
-      text = text.slice(firstHeading);
-    }
-  }
-
-  const sections: string[][] = [[]];
-  for (const line of text.split("\n")) {
-    if (line.startsWith("## ")) sections.push([]);
-    if (!EMPTY_BULLET.test(line)) {
-      sections[sections.length - 1].push(line.replace(/^(\s*)\* /, "$1- "));
-    }
-  }
-
-  return sections
-    .filter(([first, ...rest]) =>
-      first?.startsWith("## ") ? rest.some((l) => l.trim()) : true
-    )
-    .map((lines) => lines.join("\n").trim())
-    .filter(Boolean)
-    .join("\n\n");
-}
+const FORMAT_OPTIONS: { value: EntryFormat; label: string }[] = [
+  { value: "bullets", label: "Bullets" },
+  { value: "prose", label: "Prose" },
+];
 
 // The Clipboard API is unavailable outside secure contexts (e.g. opening the
 // app via a LAN IP) and can be blocked, so fall back to execCommand.
@@ -97,6 +80,9 @@ const swap = {
   transition: spring,
 };
 
+const actionButton =
+  "h-8 rounded-full px-3 text-muted-foreground active:scale-[0.96]";
+
 // Smoothly animates its height to fit its children as they grow.
 function AutoHeight({ children }: { children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -124,13 +110,29 @@ function AutoHeight({ children }: { children: ReactNode }) {
   );
 }
 
-export function JournalGenerator({ model }: { model?: string }) {
+export function JournalGenerator({ defaultModel }: { defaultModel?: string }) {
   const [notes, setNotes] = useState("");
   const [output, setOutput] = useState("");
-  const [date, setDate] = useState("");
+  const [generatedAt, setGeneratedAt] = useState(() => new Date());
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<GenerationError | null>(null);
   const [copied, setCopied] = useState(false);
+
+  const [length, setLength] = useState<EntryLength>("concise");
+  const [format, setFormat] = useState<EntryFormat>("bullets");
+  const [matchLanguage, setMatchLanguage] = useState(true);
+
+  const ollama = useOllamaModels();
+  const [pickedModel, setPickedModel] = useState(defaultModel);
+  // Without OLLAMA_MODEL, fall back to the first installed model.
+  const model = pickedModel ?? ollama.models[0];
+
+  // The user's edited Markdown; null while the entry is unedited.
+  const [draft, setDraft] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  // Words only fly in for freshly generated text, not after editing.
+  const [animateWords, setAnimateWords] = useState(true);
+
   const abortRef = useRef<AbortController | null>(null);
   const copiedTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -151,9 +153,14 @@ export function JournalGenerator({ model }: { model?: string }) {
     };
   }, [isGenerating]);
 
-  const body = cleanEntry(output);
-  const entry = body ? `# ${date}\n\n${body}` : "";
-  const canGenerate = notes.trim().length > 0 && !isGenerating;
+  // The model streams JSON; render whatever has arrived so far as Markdown.
+  const entry = entryToMarkdown(
+    toEntryData(parsePartialJson(output)),
+    generatedAt
+  );
+  const finalEntry = draft ?? entry;
+  const isEdited = draft !== null && draft !== entry;
+  const canGenerate = notes.trim().length > 0 && !isGenerating && !!model;
 
   async function generate() {
     if (!canGenerate) return;
@@ -164,13 +171,16 @@ export function JournalGenerator({ model }: { model?: string }) {
     setError(null);
     setOutput("");
     setCopied(false);
-    setDate(formatToday());
+    setDraft(null);
+    setIsEditing(false);
+    setAnimateWords(true);
+    setGeneratedAt(new Date());
 
     try {
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ notes }),
+        body: JSON.stringify({ notes, model, length, format, matchLanguage }),
         signal: controller.signal,
       });
 
@@ -180,6 +190,7 @@ export function JournalGenerator({ model }: { model?: string }) {
           title: data.error ?? `Something went wrong (${res.status}).`,
           hint: data.hint,
         });
+        ollama.refresh();
         return;
       }
 
@@ -193,7 +204,7 @@ export function JournalGenerator({ model }: { model?: string }) {
         setOutput(received);
       }
 
-      if (!received.trim()) {
+      if (!hasContent(toEntryData(parsePartialJson(received)))) {
         setError({
           title: "The model returned an empty entry.",
           hint: "Try generating again, or add a bit more detail to your notes.",
@@ -206,6 +217,7 @@ export function JournalGenerator({ model }: { model?: string }) {
         title: "Generation was interrupted.",
         hint: "The connection to Ollama dropped before the entry was finished. Check that Ollama is still running and try again.",
       });
+      ollama.refresh();
     } finally {
       if (abortRef.current === controller) abortRef.current = null;
       setIsGenerating(false);
@@ -216,10 +228,26 @@ export function JournalGenerator({ model }: { model?: string }) {
     abortRef.current?.abort();
   }
 
+  function startEditing() {
+    setDraft(finalEntry);
+    setAnimateWords(false);
+    setIsEditing(true);
+  }
+
+  function finishEditing() {
+    setIsEditing(false);
+    if (draft === entry) setDraft(null);
+  }
+
+  function revertEdits() {
+    setDraft(null);
+    setIsEditing(false);
+  }
+
   async function copy() {
     setError(null);
     try {
-      await writeToClipboard(entry);
+      await writeToClipboard(finalEntry);
       setCopied(true);
       clearTimeout(copiedTimer.current);
       copiedTimer.current = setTimeout(() => setCopied(false), 2000);
@@ -274,17 +302,51 @@ export function JournalGenerator({ model }: { model?: string }) {
                   )}
                   autoFocus
                 />
-                <div className="flex items-center gap-3 px-3 pt-1 pb-3 pl-5">
-                  <span
-                    className="flex min-w-0 items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground"
-                    title={model ? `Model: ${model}` : "OLLAMA_MODEL is not set"}
+
+                <div className="flex flex-wrap items-center gap-2 px-5 pt-1 pb-2">
+                  <SegmentedControl
+                    name="Length"
+                    value={length}
+                    options={LENGTH_OPTIONS}
+                    onChange={setLength}
+                    disabled={isGenerating}
+                  />
+                  <SegmentedControl
+                    name="Format"
+                    value={format}
+                    options={FORMAT_OPTIONS}
+                    onChange={setFormat}
+                    disabled={isGenerating}
+                  />
+                  <label
+                    className={cn(
+                      "flex h-7 cursor-pointer items-center gap-2 rounded-full bg-muted pr-1.5 pl-2.5 text-xs font-medium text-muted-foreground select-none",
+                      isGenerating && "pointer-events-none opacity-50"
+                    )}
+                    title={
+                      matchLanguage
+                        ? "The entry is written in the language of your notes"
+                        : "The entry is written in English"
+                    }
                   >
-                    <CpuIcon className="size-3.5 shrink-0" aria-hidden />
-                    <span className="sr-only">Model:</span>
-                    <span className="truncate font-mono">
-                      {model ?? "no model set"}
-                    </span>
-                  </span>
+                    <LanguagesIcon className="size-3.5" aria-hidden />
+                    Same language as notes
+                    <Switch
+                      size="sm"
+                      checked={matchLanguage}
+                      onCheckedChange={setMatchLanguage}
+                      disabled={isGenerating}
+                    />
+                  </label>
+                </div>
+
+                <div className="flex items-center gap-3 px-3 pt-1 pb-3 pl-5">
+                  <ModelSelect
+                    state={ollama}
+                    value={model}
+                    onChange={setPickedModel}
+                    disabled={isGenerating}
+                  />
                   <p className="hidden items-center gap-1 text-xs text-muted-foreground/80 md:flex">
                     <kbd className="rounded-md bg-muted px-1.5 py-0.5 font-sans">
                       ⌘
@@ -319,7 +381,7 @@ export function JournalGenerator({ model }: { model?: string }) {
                     <Button
                       type="submit"
                       size="lg"
-                      disabled={!isGenerating && !notes.trim()}
+                      disabled={!isGenerating && !canGenerate}
                       className="relative h-10 min-w-30 overflow-hidden rounded-full px-5 text-[0.9375rem] transition-[scale,opacity,background-color] duration-200 active:scale-[0.96]"
                     >
                       <AnimatePresence mode="popLayout" initial={false}>
@@ -407,7 +469,9 @@ export function JournalGenerator({ model }: { model?: string }) {
                 <div className="flex min-h-14 items-center justify-between gap-3 px-6 pt-4">
                   <AnimatePresence mode="popLayout" initial={false}>
                     <motion.span
-                      key={isGenerating ? "writing" : "done"}
+                      key={
+                        isGenerating ? "writing" : isEdited ? "edited" : "done"
+                      }
                       {...swap}
                       className={cn(
                         "text-sm font-medium whitespace-nowrap",
@@ -416,7 +480,11 @@ export function JournalGenerator({ model }: { model?: string }) {
                           : "text-muted-foreground"
                       )}
                     >
-                      {isGenerating ? "Writing your entry…" : "Journal entry"}
+                      {isGenerating
+                        ? "Writing your entry…"
+                        : isEdited
+                          ? "Journal entry · Edited"
+                          : "Journal entry"}
                     </motion.span>
                   </AnimatePresence>
 
@@ -430,16 +498,58 @@ export function JournalGenerator({ model }: { model?: string }) {
                         transition={{ ...spring, delay: 0.15 }}
                         className="flex items-center gap-1"
                       >
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 rounded-full px-3 text-muted-foreground active:scale-[0.96]"
-                          onClick={generate}
-                          disabled={!canGenerate}
-                        >
-                          <RotateCcwIcon data-icon="inline-start" />
-                          Regenerate
-                        </Button>
+                        {isEditing ? (
+                          <>
+                            {isEdited && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className={actionButton}
+                                onClick={revertEdits}
+                                aria-label="Revert edits"
+                              >
+                                <Undo2Icon data-icon="inline-start" />
+                                <span className="hidden sm:inline">Revert</span>
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className={actionButton}
+                              onClick={finishEditing}
+                              aria-label="Done editing"
+                            >
+                              <CheckIcon data-icon="inline-start" />
+                              <span className="hidden sm:inline">Done</span>
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className={actionButton}
+                              onClick={startEditing}
+                              aria-label="Edit entry"
+                            >
+                              <PencilIcon data-icon="inline-start" />
+                              <span className="hidden sm:inline">Edit</span>
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className={actionButton}
+                              onClick={generate}
+                              disabled={!canGenerate}
+                              aria-label="Regenerate entry"
+                            >
+                              <RotateCcwIcon data-icon="inline-start" />
+                              <span className="hidden sm:inline">
+                                Regenerate
+                              </span>
+                            </Button>
+                          </>
+                        )}
                         <Button
                           variant="secondary"
                           size="sm"
@@ -473,15 +583,38 @@ export function JournalGenerator({ model }: { model?: string }) {
                 <AutoHeight>
                   <div className="px-6 pt-3 pb-7">
                     <AnimatePresence mode="popLayout" initial={false}>
-                      {entry ? (
+                      {isEditing ? (
+                        <motion.div
+                          key="editor"
+                          initial={{ opacity: 0, filter: "blur(4px)" }}
+                          animate={{ opacity: 1, filter: "blur(0px)" }}
+                          exit={{ opacity: 0, filter: "blur(4px)" }}
+                          transition={spring}
+                        >
+                          <label htmlFor="entry-editor" className="sr-only">
+                            Edit journal entry (Markdown)
+                          </label>
+                          <Textarea
+                            id="entry-editor"
+                            value={draft ?? ""}
+                            onChange={(e) => setDraft(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Escape") finishEditing();
+                            }}
+                            autoFocus
+                            className="min-h-40 resize-none rounded-2xl border-0 bg-muted/60 p-4 font-mono text-[0.8125rem] leading-6 focus-visible:ring-2 md:text-[0.8125rem] dark:bg-muted/40"
+                          />
+                        </motion.div>
+                      ) : finalEntry ? (
                         <motion.div
                           key="entry"
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
                         >
                           <JournalEntry
-                            markdown={entry}
+                            markdown={finalEntry}
                             streaming={isGenerating}
+                            animate={animateWords}
                           />
                         </motion.div>
                       ) : (

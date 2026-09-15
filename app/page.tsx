@@ -1,10 +1,11 @@
 import { connection } from "next/server";
 
 import { JournalGenerator } from "@/components/journal-generator";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { TodayLabel } from "@/components/today-label";
 
 export default async function Home() {
-  // Render per request so the model shown matches the current OLLAMA_MODEL.
+  // Render per request so the default model matches the current OLLAMA_MODEL.
   await connection();
   const model = process.env.OLLAMA_MODEL;
 
@@ -18,9 +19,12 @@ export default async function Home() {
         </div>
       </div>
       <header className="flex flex-col gap-2 px-2 animate-in duration-700 fill-mode-both fade-in blur-in slide-in-from-bottom-3">
-        <p className="text-[0.8rem] font-semibold tracking-wide text-muted-foreground uppercase">
-          <TodayLabel />
-        </p>
+        <div className="flex items-center justify-between gap-4">
+          <p className="text-[0.8rem] font-semibold tracking-wide text-muted-foreground uppercase">
+            <TodayLabel />
+          </p>
+          <ThemeToggle />
+        </div>
         <h1 className="font-heading text-5xl font-bold tracking-tight">
           Journ
         </h1>
@@ -29,7 +33,7 @@ export default async function Home() {
           into a clean journal entry. Nothing is saved.
         </p>
       </header>
-      <JournalGenerator model={model} />
+      <JournalGenerator defaultModel={model} />
     </main>
   );
 }
