@@ -1,6 +1,7 @@
 import { connection } from "next/server";
 
 import { JournalGenerator } from "@/components/journal-generator";
+import { OnboardingButton } from "@/components/onboarding";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { TodayLabel } from "@/components/today-label";
 import { loadExamples } from "@/lib/examples";
@@ -27,7 +28,10 @@ export default async function Home() {
           <p className="text-[0.8rem] font-semibold tracking-wide text-muted-foreground uppercase">
             <TodayLabel />
           </p>
-          <ThemeToggle />
+          <div className="flex items-center gap-2">
+            <OnboardingButton />
+            <ThemeToggle />
+          </div>
         </div>
         <h1 className="font-heading text-5xl font-bold tracking-tight">
           Journ
