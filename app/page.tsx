@@ -21,6 +21,7 @@ export default async function Home() {
           <span />
         </div>
       </div>
+      <div className="journ-edge" aria-hidden />
       <header className="flex flex-col gap-2 px-2 animate-in duration-700 fill-mode-both fade-in blur-in slide-in-from-bottom-3">
         <div className="flex items-center justify-between gap-4">
           <p className="text-[0.8rem] font-semibold tracking-wide text-muted-foreground uppercase">

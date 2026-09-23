@@ -390,6 +390,67 @@ html[data-generating="true"] .journ-aurora {
   scale: 1.15;
 }
 
+/* Siri-style rainbow light around the edges of the screen while writing.
+   An oversized conic gradient spins (a cheap, GPU-composited transform) and
+   a mask of four edge gradients lets it through only near the edges, fading
+   smoothly inwards, so no blur is needed. */
+.journ-edge {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --journ-edge-fade:
+    #000, rgb(0 0 0 / 0.55) 6px, rgb(0 0 0 / 0.2) 22px, rgb(0 0 0 / 0.06) 40px,
+    transparent 64px;
+  mask:
+    linear-gradient(to bottom, var(--journ-edge-fade)),
+    linear-gradient(to top, var(--journ-edge-fade)),
+    linear-gradient(to right, var(--journ-edge-fade)),
+    linear-gradient(to left, var(--journ-edge-fade));
+}
+
+.journ-edge::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 150vmax;
+  height: 150vmax;
+  translate: -50% -50%;
+  background: conic-gradient(
+    #0a84ff,
+    #5e5ce6,
+    #bf5af2,
+    #ff375f,
+    #ff9f0a,
+    #bf5af2,
+    #0a84ff
+  );
+  will-change: rotate;
+  animation:
+    journ-edge-spin 6s linear infinite,
+    journ-edge-breathe 3s ease-in-out infinite;
+}
+
+@keyframes journ-edge-spin {
+  to {
+    rotate: 360deg;
+  }
+}
+
+@keyframes journ-edge-breathe {
+  50% {
+    opacity: 0.65;
+  }
+}
+
+html[data-generating="true"] .journ-edge {
+  opacity: 1;
+}
+
 .dark .journ-aurora {
   opacity: 0.3;
 }
@@ -407,7 +468,8 @@ html.dark[data-generating="true"] .journ-aurora {
   .journ-skeleton,
   .journ-shine,
   .journ-aurora > div,
-  .journ-aurora span {
+  .journ-aurora span,
+  .journ-edge::before {
     animation: none;
   }
 
