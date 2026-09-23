@@ -1,0 +1,4 @@
+heute morgen daily, dann deep work am feature flag refactoring
+lunch mit dem team, war ganz nice
+PR ist approved aber noch nicht gemerged, CI failed wegen linting
+abends meal prep für die woche

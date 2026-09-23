@@ -1,0 +1,14 @@
+alarm didn't go off, woke up 7:45 instead of 6:30, rushed
+skipped breakfast, grabbed croissant at station
+9:00 client call w/ Müller AG about the migration timeline - they want go-live moved from nov 15 to dec 1, need to check with ops
+10-12 workshop with design team on the new onboarding flow, agreed on 4 steps instead of 6, sketches by friday
+lunch at desk (bad idea)
+1:30 1:1 with my manager lisa, talked about taking the team lead role in q1, she's supportive but needs to talk to her boss first
+afternoon: wrote the RFC for the caching layer, about 70% done, still missing the invalidation section
+3 coffees today way too many
+4:45 dentist cancelled my appointment, rescheduled to next thurs 8am
+evening: cooked lentil curry, first time, turned out ok but too spicy
+called grandma for her 85th birthday, she was really happy
+read 30 pages of dune
+feeling: tired but good day overall, excited about team lead thing, a bit worried about the go-live change
+todo tmrw: email ops re Müller timeline, finish RFC invalidation section, buy birthday card for jonas

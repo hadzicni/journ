@@ -1,0 +1,6 @@
+standup 9:15, sprint planning after. picked up JIRA-482 (login timeout bug)
+lunch w/ sarah at the thai place
+code review for marco's PR, left 6 comments
+fixed the flaky test in checkout suite finally!!
+started on JIRA-490 but only got the branch set up
+left at 5:30
