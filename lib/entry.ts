@@ -7,11 +7,15 @@ export type EntryOptions = {
   matchLanguage: boolean;
 };
 
+// The entry is split into these sections, in this order. Sections the notes
+// have nothing for stay empty and are left out.
+export const SECTIONS = ["done", "feelings", "plans"] as const;
+export type Section = (typeof SECTIONS)[number];
+
+// Bullets come as a list of items per section, prose as a single text.
 export type EntryData = {
   language?: string;
-  items?: string[];
-  text?: string;
-};
+} & Partial<Record<Section, string[] | string>>;
 
 // ISO 639-1 codes the model may answer with. A fixed list keeps small models
 // from replying with names like "deutsch".
@@ -21,22 +25,24 @@ export const LANGUAGES = [
   "uk", "ar", "he", "hi", "ja", "ko", "zh", "id", "vi", "th",
 ] as const;
 
-const WHAT_I_DID: Record<string, string> = {
-  en: "What I did",
-  de: "Was ich gemacht habe",
-  fr: "Ce que j'ai fait",
-  es: "Lo que hice",
-  it: "Cosa ho fatto",
-  pt: "O que fiz",
-  nl: "Wat ik heb gedaan",
-  sv: "Vad jag gjorde",
-  da: "Hvad jeg lavede",
-  no: "Hva jeg gjorde",
-  pl: "Mój dzień",
-  hr: "Moj dan",
-  sr: "Moj dan",
-  bs: "Moj dan",
-  tr: "Neler yaptım",
+// Section headings per language. Noun phrases where a verb would need a
+// gendered form (e.g. Polish, Croatian).
+const HEADINGS: Record<string, Record<Section, string>> = {
+  en: { done: "What I did", feelings: "How I felt", plans: "Plans" },
+  de: { done: "Was ich gemacht habe", feelings: "Wie es mir ging", plans: "Pläne" },
+  fr: { done: "Ce que j'ai fait", feelings: "Mon ressenti", plans: "À venir" },
+  es: { done: "Lo que hice", feelings: "Cómo me sentí", plans: "Planes" },
+  it: { done: "Cosa ho fatto", feelings: "Stato d'animo", plans: "Piani" },
+  pt: { done: "O que fiz", feelings: "Como me senti", plans: "Planos" },
+  nl: { done: "Wat ik heb gedaan", feelings: "Hoe ik me voelde", plans: "Plannen" },
+  sv: { done: "Vad jag gjorde", feelings: "Hur jag mådde", plans: "Planer" },
+  da: { done: "Hvad jeg lavede", feelings: "Hvordan jeg havde det", plans: "Planer" },
+  no: { done: "Hva jeg gjorde", feelings: "Hvordan jeg hadde det", plans: "Planer" },
+  pl: { done: "Mój dzień", feelings: "Samopoczucie", plans: "Plany" },
+  hr: { done: "Moj dan", feelings: "Osjećaji", plans: "Planovi" },
+  sr: { done: "Moj dan", feelings: "Osećanja", plans: "Planovi" },
+  bs: { done: "Moj dan", feelings: "Osjećaji", plans: "Planovi" },
+  tr: { done: "Neler yaptım", feelings: "Nasıl hissettim", plans: "Planlar" },
 };
 
 // Parses JSON that may still be streaming in, by closing whatever is open.
@@ -110,22 +116,42 @@ export function parsePartialJson(text: string): unknown {
   return undefined;
 }
 
+function toSection(value: unknown): string[] | string | undefined {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) {
+    return value.filter((item): item is string => typeof item === "string");
+  }
+  return undefined;
+}
+
 export function toEntryData(value: unknown): EntryData {
   if (!value || typeof value !== "object") return {};
-  const { language, items, text } = value as Record<string, unknown>;
-  return {
-    language: typeof language === "string" ? language : undefined,
-    items: Array.isArray(items)
-      ? items.filter((item): item is string => typeof item === "string")
-      : undefined,
-    text: typeof text === "string" ? text : undefined,
+  const record = value as Record<string, unknown>;
+  const data: EntryData = {
+    language:
+      typeof record.language === "string" ? record.language : undefined,
   };
+  for (const section of SECTIONS) data[section] = toSection(record[section]);
+  return data;
+}
+
+function sectionBody(value: string[] | string | undefined) {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => item.trim().replace(/^[-*•]\s+/, ""))
+      .filter(Boolean)
+      .map((item) => `- ${item}`)
+      .join("\n");
+  }
+  return (value ?? "")
+    .split(/\n\s*\n/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 export function hasContent(data: EntryData) {
-  return Boolean(
-    data.items?.some((item) => item.trim()) || data.text?.trim()
-  );
+  return SECTIONS.some((section) => sectionBody(data[section]));
 }
 
 function formatDate(date: Date, language: string) {
@@ -143,22 +169,14 @@ function formatDate(date: Date, language: string) {
 }
 
 export function entryToMarkdown(data: EntryData, date: Date) {
-  if (!hasContent(data)) return "";
-
   const language = data.language?.toLowerCase().slice(0, 2) || "en";
-  const heading = WHAT_I_DID[language] ?? WHAT_I_DID.en;
+  const headings = HEADINGS[language] ?? HEADINGS.en;
 
-  const body = data.items
-    ? data.items
-        .map((item) => item.trim().replace(/^[-*•]\s+/, ""))
-        .filter(Boolean)
-        .map((item) => `- ${item}`)
-        .join("\n")
-    : (data.text ?? "")
-        .split(/\n\s*\n/)
-        .map((paragraph) => paragraph.trim())
-        .filter(Boolean)
-        .join("\n\n");
+  const sections = SECTIONS.flatMap((section) => {
+    const body = sectionBody(data[section]);
+    return body ? [`## ${headings[section]}\n\n${body}`] : [];
+  });
+  if (sections.length === 0) return "";
 
-  return `# ${formatDate(date, language)}\n\n## ${heading}\n\n${body}`;
+  return [`# ${formatDate(date, language)}`, ...sections].join("\n\n");
 }

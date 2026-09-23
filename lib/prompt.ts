@@ -1,11 +1,11 @@
-import { LANGUAGES, type EntryOptions } from "@/lib/entry";
+import { LANGUAGES, SECTIONS, type EntryOptions } from "@/lib/entry";
 
 const RULES = `Rules:
 - Use ONLY information found in the notes. Never invent events, people, places, times, feelings, reasons, or outcomes.
 - Keep every concrete detail from the notes: names, numbers, times, places.
 - Keep separate items separate. Do not merge unrelated notes into one sentence or connect them with causes that are not stated.
 - Preserve the status/outcome of each activity exactly as stated (e.g. "fixed" vs "started" vs "still working on" are not interchangeable).
-- Write in the first person ("I"), past tense, in plain and natural language.
+- Write in the first person ("I"), in plain and natural language: past tense for what happened, future or present tense for plans.
 - Fix spelling, grammar, and shorthand, but do not change the meaning.
 - If something in the notes is unclear, keep it close to the original wording rather than guessing.`;
 
@@ -22,11 +22,17 @@ const LENGTH_RULES = {
     "Be detailed: write full, descriptive sentences that carry over all context and nuance from the notes, but still add nothing that isn't in them.",
 };
 
+const SECTION_RULES = `Sort everything from the notes into three sections, leaving nothing out:
+- "done": activities and events of the day, each with its status exactly as stated (including things started but not finished).
+- "feelings": moods, emotions, energy, and how things felt, only where the notes state them.
+- "plans": things still to do, intentions, and plans for later, kept as plans rather than things that were done.
+Leave a section empty if the notes contain nothing for it. Never fill a section with invented content.`;
+
 const FORMAT_RULES = {
   bullets:
-    'Put the entry in "items": one item per activity or event from the notes, in the order they happened when that is clear. Include everything from the notes — activities, feelings, and plans alike — each as its own item. Items are plain sentences without bullet characters or Markdown.',
+    "Each section is a list of items: one item per activity, feeling, or plan, in the order they happened when that is clear. Items are plain sentences without bullet characters or Markdown.",
   prose:
-    'Put the entry in "text": flowing prose in one or more short paragraphs (separate paragraphs with a blank line) that covers everything from the notes — activities, feelings, and plans alike — in the order they happened when that is clear. No headings, lists, or Markdown.',
+    "Each section is flowing prose in one or more short paragraphs (separate paragraphs with a blank line), in the order things happened when that is clear. No headings, lists, or Markdown.",
 };
 
 export function buildSystemPrompt(options: EntryOptions) {
@@ -35,6 +41,7 @@ export function buildSystemPrompt(options: EntryOptions) {
     RULES,
     LANGUAGE_RULES[options.matchLanguage ? "match" : "english"],
     LENGTH_RULES[options.length],
+    SECTION_RULES,
     FORMAT_RULES[options.format],
     "Respond only with JSON that matches the given schema.",
   ].join("\n\n");
@@ -45,6 +52,10 @@ export function buildSystemPrompt(options: EntryOptions) {
 // It also satisfies OpenAI's strict mode: every property is required and no
 // others are allowed.
 export function entrySchema(options: EntryOptions) {
+  const section =
+    options.format === "bullets"
+      ? { type: "array", items: { type: "string" } }
+      : { type: "string" };
   return {
     type: "object",
     properties: {
@@ -52,11 +63,9 @@ export function entrySchema(options: EntryOptions) {
         type: "string",
         enum: options.matchLanguage ? LANGUAGES : ["en"],
       },
-      ...(options.format === "bullets"
-        ? { items: { type: "array", items: { type: "string" } } }
-        : { text: { type: "string" } }),
+      ...Object.fromEntries(SECTIONS.map((name) => [name, section])),
     },
-    required: ["language", options.format === "bullets" ? "items" : "text"],
+    required: ["language", ...SECTIONS],
     additionalProperties: false,
   };
 }
@@ -66,23 +75,28 @@ dinner at home, watched a movie w/ alex
 stressed about deadline
 need to email tom re: budget numbers`;
 
-const EXAMPLE_ITEMS = [
-  "Went to the dentist at 8am.",
-  "Worked on the quarterly report for most of the day; it isn't finished yet.",
-  "Had dinner at home.",
-  "Watched a movie with Alex.",
-  "Felt stressed about the deadline.",
-  "Need to email Tom about the budget numbers.",
-];
+const EXAMPLE_ITEMS = {
+  done: [
+    "Went to the dentist at 8am.",
+    "Worked on the quarterly report for most of the day; it isn't finished yet.",
+    "Had dinner at home.",
+    "Watched a movie with Alex.",
+  ],
+  feelings: ["Felt stressed about the deadline."],
+  plans: ["Need to email Tom about the budget numbers."],
+};
 
-const EXAMPLE_TEXT = `I went to the dentist at 8am and then worked on the quarterly report for most of the day, though it isn't finished yet.
+const EXAMPLE_TEXT = {
+  done: `I went to the dentist at 8am and then worked on the quarterly report for most of the day, though it isn't finished yet.
 
-In the evening I had dinner at home and watched a movie with Alex. I felt stressed about the deadline, and I still need to email Tom about the budget numbers.`;
+In the evening I had dinner at home and watched a movie with Alex.`,
+  feelings: "I felt stressed about the deadline.",
+  plans: "I still need to email Tom about the budget numbers.",
+};
 
 export function exampleEntry(options: EntryOptions) {
-  return JSON.stringify(
-    options.format === "bullets"
-      ? { language: "en", items: EXAMPLE_ITEMS }
-      : { language: "en", text: EXAMPLE_TEXT }
-  );
+  return JSON.stringify({
+    language: "en",
+    ...(options.format === "bullets" ? EXAMPLE_ITEMS : EXAMPLE_TEXT),
+  });
 }
