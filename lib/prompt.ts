@@ -32,7 +32,7 @@ const FORMAT_RULES = {
   bullets:
     "Each section is a list of items: one item per activity, feeling, or plan, in the order they happened when that is clear. Items are plain sentences without bullet characters or Markdown.",
   prose:
-    "Each section is flowing prose in one or more short paragraphs (separate paragraphs with a blank line), in the order things happened when that is clear. No headings, lists, or Markdown.",
+    "Each section is flowing prose, in the order things happened when that is clear. Connect related sentences into paragraphs of several sentences; a section usually needs only one paragraph. Start a new paragraph (separated by a blank line) only for a clear change, such as from morning to evening, and never put each sentence in its own paragraph. No headings, lists, or Markdown.",
 };
 
 export function buildSystemPrompt(options: EntryOptions) {
