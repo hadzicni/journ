@@ -6,6 +6,8 @@ import {
   CheckIcon,
   CircleAlertIcon,
   CopyIcon,
+  DicesIcon,
+  DownloadIcon,
   LanguagesIcon,
   PencilIcon,
   RotateCcwIcon,
@@ -70,6 +72,22 @@ async function writeToClipboard(text: string) {
   if (!ok) throw new Error("Copy command was rejected");
 }
 
+// Saves the entry as e.g. "journal-2026-09-23.md", named after its local date.
+function downloadMarkdown(markdown: string, date: Date) {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const day = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  const url = URL.createObjectURL(
+    new Blob([markdown], { type: "text/markdown;charset=utf-8" })
+  );
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `journal-${day}.md`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 const spring = { type: "spring", bounce: 0, duration: 0.45 } as const;
 
 // Content swaps (button labels, icons) slide and un-blur into place.
@@ -110,7 +128,13 @@ function AutoHeight({ children }: { children: ReactNode }) {
   );
 }
 
-export function JournalGenerator({ defaultModel }: { defaultModel?: string }) {
+export function JournalGenerator({
+  defaultModel,
+  examples = [],
+}: {
+  defaultModel?: string;
+  examples?: string[];
+}) {
   const [notes, setNotes] = useState("");
   const [output, setOutput] = useState("");
   const [generatedAt, setGeneratedAt] = useState(() => new Date());
@@ -133,6 +157,8 @@ export function JournalGenerator({ defaultModel }: { defaultModel?: string }) {
   // Words only fly in for freshly generated text, not after editing.
   const [animateWords, setAnimateWords] = useState(true);
 
+  const notesRef = useRef<HTMLTextAreaElement>(null);
+  const lastExample = useRef(-1);
   const abortRef = useRef<AbortController | null>(null);
   const copiedTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -244,6 +270,18 @@ export function JournalGenerator({ defaultModel }: { defaultModel?: string }) {
     setIsEditing(false);
   }
 
+  // Fills in a random example, never the same one twice in a row.
+  function tryExample() {
+    if (examples.length === 0) return;
+    let next = Math.floor(Math.random() * examples.length);
+    if (examples.length > 1 && next === lastExample.current) {
+      next = (next + 1) % examples.length;
+    }
+    lastExample.current = next;
+    setNotes(examples[next]);
+    notesRef.current?.focus();
+  }
+
   async function copy() {
     setError(null);
     try {
@@ -285,6 +323,7 @@ export function JournalGenerator({ defaultModel }: { defaultModel?: string }) {
                   Notes about your day
                 </label>
                 <Textarea
+                  ref={notesRef}
                   id="notes"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
@@ -357,7 +396,27 @@ export function JournalGenerator({ defaultModel }: { defaultModel?: string }) {
                     <span className="ml-1">to generate</span>
                   </p>
                   <div className="ml-auto flex items-center gap-1.5">
-                    <AnimatePresence initial={false}>
+                    <AnimatePresence mode="popLayout" initial={false}>
+                      {!notes && !isGenerating && examples.length > 0 && (
+                        <motion.div
+                          key="example"
+                          initial={{ opacity: 0, scale: 0.9 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.9 }}
+                          transition={spring}
+                        >
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="lg"
+                            className="h-10 rounded-full px-4 text-muted-foreground"
+                            onClick={tryExample}
+                          >
+                            <DicesIcon data-icon="inline-start" />
+                            Try an example
+                          </Button>
+                        </motion.div>
+                      )}
                       {notes && !isGenerating && (
                         <motion.div
                           key="clear"
@@ -550,6 +609,19 @@ export function JournalGenerator({ defaultModel }: { defaultModel?: string }) {
                             </Button>
                           </>
                         )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className={actionButton}
+                          onClick={() =>
+                            downloadMarkdown(finalEntry, generatedAt)
+                          }
+                          aria-label="Download entry as Markdown"
+                          title="Download as Markdown (.md)"
+                        >
+                          <DownloadIcon data-icon="inline-start" />
+                          <span className="hidden sm:inline">Download</span>
+                        </Button>
                         <Button
                           variant="secondary"
                           size="sm"

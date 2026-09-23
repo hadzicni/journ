@@ -3,12 +3,14 @@ import { connection } from "next/server";
 import { JournalGenerator } from "@/components/journal-generator";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { TodayLabel } from "@/components/today-label";
+import { loadExamples } from "@/lib/examples";
 import { defaultModelId } from "@/lib/providers";
 
 export default async function Home() {
   // Render per request so the default model matches the current env config.
   await connection();
   const model = defaultModelId();
+  const examples = await loadExamples();
 
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-10 px-4 py-14 sm:py-24">
@@ -34,7 +36,7 @@ export default async function Home() {
           turns it into a clean journal entry. Nothing is saved.
         </p>
       </header>
-      <JournalGenerator defaultModel={model} />
+      <JournalGenerator defaultModel={model} examples={examples} />
     </main>
   );
 }
