@@ -29,6 +29,7 @@ import { Onboarding } from "@/components/onboarding";
 import { ModelSelect, useModels } from "@/components/model-select";
 import { SegmentedControl } from "@/components/segmented-control";
 import { Tilt } from "@/components/tilt";
+import { WritingTools } from "@/components/writing-tools";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -190,7 +191,7 @@ export function JournalGenerator({
   const [isEditing, setIsEditing] = useState(false);
   // Words only fly in for freshly generated text, not after editing.
   const [animateWords, setAnimateWords] = useState(true);
-  // The entry before the last regenerate, to switch back to. `undone` is
+  // The entry before the last regenerate or rewrite, to switch back to. `undone` is
   // true while it's the one shown, so the button offers to redo instead.
   const [previous, setPrevious] = useState<Version | null>(null);
   const [undone, setUndone] = useState(false);
@@ -354,7 +355,17 @@ export function JournalGenerator({
     setIsEditing(false);
   }
 
-  // Swaps the shown entry with the one from before the last regenerate.
+  // Applies a Writing Tools rewrite as an edit that can be undone.
+  function applyRewrite(markdown: string) {
+    setPrevious({ output, generatedAt, draft });
+    setUndone(false);
+    setDraft(markdown);
+    setAnimateWords(false);
+    setCopied(false);
+  }
+
+  // Swaps the shown entry with the version before the last regenerate or
+  // rewrite.
   function toggleUndo() {
     if (!previous) return;
     setPrevious({ output, generatedAt, draft });
@@ -731,15 +742,11 @@ export function JournalGenerator({
                                   size="sm"
                                   className={actionButton}
                                   onClick={toggleUndo}
-                                  aria-label={
-                                    undone
-                                      ? "Redo regenerate"
-                                      : "Undo regenerate"
-                                  }
+                                  aria-label={undone ? "Redo" : "Undo"}
                                   title={
                                     undone
-                                      ? "Back to the regenerated entry"
-                                      : "Back to the previous entry"
+                                      ? "Back to the newer version"
+                                      : "Back to the previous version"
                                   }
                                 >
                                   {undone ? (
@@ -844,11 +851,19 @@ export function JournalGenerator({
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                           >
-                            <JournalEntry
+                            <WritingTools
                               markdown={finalEntry}
-                              streaming={isGenerating}
-                              animate={animateWords}
-                            />
+                              notes={notes}
+                              model={model}
+                              disabled={isGenerating}
+                              onReplace={applyRewrite}
+                            >
+                              <JournalEntry
+                                markdown={finalEntry}
+                                streaming={isGenerating}
+                                animate={animateWords}
+                              />
+                            </WritingTools>
                           </motion.div>
                         ) : (
                           <motion.div
@@ -873,8 +888,8 @@ export function JournalGenerator({
                 )}
               </Tilt>
               <p className="mt-3 px-6 text-center text-xs text-muted-foreground/80">
-                AI can make mistakes. Check the entry against your notes before
-                you keep it.
+                Select any text to rewrite it. AI can make mistakes, so check
+                the entry against your notes before you keep it.
               </p>
             </motion.div>
           )}
