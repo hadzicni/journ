@@ -15,6 +15,8 @@ export type Section = (typeof SECTIONS)[number];
 // Bullets come as a list of items per section, prose as a single text.
 export type EntryData = {
   language?: string;
+  // The whole day in one sentence, shown as a quote above the sections.
+  summary?: string;
 } & Partial<Record<Section, string[] | string>>;
 
 // ISO 639-1 codes the model may answer with. A fixed list keeps small models
@@ -151,6 +153,7 @@ export function toEntryData(value: unknown): EntryData {
   const data: EntryData = {
     language:
       typeof record.language === "string" ? record.language : undefined,
+    summary: typeof record.summary === "string" ? record.summary : undefined,
   };
   for (const section of SECTIONS) data[section] = toSection(record[section]);
   return data;
@@ -193,11 +196,17 @@ export function entryToMarkdown(data: EntryData, date: Date) {
   const language = data.language?.toLowerCase().slice(0, 2) || "en";
   const headings = HEADINGS[language as Language] ?? HEADINGS.en;
 
+  // The summary streams in first, so show it before any section arrives.
+  const summary = data.summary?.replace(/\s+/g, " ").trim();
   const sections = SECTIONS.flatMap((section) => {
     const body = sectionBody(data[section]);
     return body ? [`## ${headings[section]}\n\n${body}`] : [];
   });
-  if (sections.length === 0) return "";
+  if (!summary && sections.length === 0) return "";
 
-  return [`# ${formatDate(date, language)}`, ...sections].join("\n\n");
+  return [
+    `# ${formatDate(date, language)}`,
+    ...(summary ? [`> ${summary}`] : []),
+    ...sections,
+  ].join("\n\n");
 }

@@ -22,7 +22,10 @@ const LENGTH_RULES = {
     "Be detailed: write full, descriptive sentences that carry over all context and nuance from the notes, but still add nothing that isn't in them.",
 };
 
-const SECTION_RULES = `Sort everything from the notes into three sections, leaving nothing out:
+const SUMMARY_RULE =
+  'Start with "summary": the whole day in one short sentence, written like the rest of the entry. It must only reflect what the notes say; no judgments, moods, or conclusions that aren\'t in them.';
+
+const SECTION_RULES = `Then sort everything from the notes into three sections, leaving nothing out:
 - "done": activities and events of the day, each with its status exactly as stated (including things started but not finished).
 - "feelings": moods, emotions, energy, and how things felt, only where the notes state them.
 - "plans": things still to do, intentions, and plans for later, kept as plans rather than things that were done.
@@ -41,6 +44,7 @@ export function buildSystemPrompt(options: EntryOptions) {
     RULES,
     LANGUAGE_RULES[options.matchLanguage ? "match" : "english"],
     LENGTH_RULES[options.length],
+    SUMMARY_RULE,
     SECTION_RULES,
     FORMAT_RULES[options.format],
     "Respond only with JSON that matches the given schema.",
@@ -48,7 +52,8 @@ export function buildSystemPrompt(options: EntryOptions) {
 }
 
 // The provider constrains the output to this JSON schema, so the entry always
-// has the expected shape. "language" comes first so it's known before the text.
+// has the expected shape. "language" comes first so it's known before the text,
+// then "summary", which is shown above the sections.
 // It also satisfies OpenAI's strict mode: every property is required and no
 // others are allowed.
 export function entrySchema(options: EntryOptions) {
@@ -63,9 +68,10 @@ export function entrySchema(options: EntryOptions) {
         type: "string",
         enum: options.matchLanguage ? LANGUAGES : ["en"],
       },
+      summary: { type: "string" },
       ...Object.fromEntries(SECTIONS.map((name) => [name, section])),
     },
-    required: ["language", ...SECTIONS],
+    required: ["language", "summary", ...SECTIONS],
     additionalProperties: false,
   };
 }
@@ -74,6 +80,9 @@ export const EXAMPLE_NOTES = `dentist 8am. worked on quarterly report most of da
 dinner at home, watched a movie w/ alex
 stressed about deadline
 need to email tom re: budget numbers`;
+
+const EXAMPLE_SUMMARY =
+  "A day of dentist, an unfinished quarterly report, and a quiet evening with Alex.";
 
 const EXAMPLE_ITEMS = {
   done: [
@@ -97,6 +106,7 @@ In the evening I had dinner at home and watched a movie with Alex.`,
 export function exampleEntry(options: EntryOptions) {
   return JSON.stringify({
     language: "en",
+    summary: EXAMPLE_SUMMARY,
     ...(options.format === "bullets" ? EXAMPLE_ITEMS : EXAMPLE_TEXT),
   });
 }
