@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
 import { AnimatePresence, motion, MotionConfig } from "motion/react";
 import {
   CheckIcon,
@@ -94,6 +100,23 @@ function downloadMarkdown(markdown: string, date: Date) {
   URL.revokeObjectURL(url);
 }
 
+// Apple devices show ⌘ for the shortcut, everything else Ctrl. Unknown until
+// hydrated, since the server can't tell.
+const subscribeNever = () => () => {};
+function useIsApple() {
+  return useSyncExternalStore(
+    subscribeNever,
+    () => {
+      const nav = navigator as Navigator & {
+        userAgentData?: { platform?: string };
+      };
+      const platform = nav.userAgentData?.platform || nav.platform || "";
+      return /mac|iphone|ipad|ipod/i.test(platform);
+    },
+    () => null
+  );
+}
+
 const spring = { type: "spring", bounce: 0, duration: 0.45 } as const;
 
 // Content swaps (button labels, icons) slide and un-blur into place.
@@ -156,6 +179,7 @@ export function JournalGenerator({
   const [matchLanguage, setMatchLanguage] = useState(true);
 
   const models = useModels();
+  const isApple = useIsApple();
   const [pickedModel, setPickedModel] = useState(defaultModel);
   // Without a configured default model, fall back to the first available one.
   const model = pickedModel ?? models.firstModel;
@@ -463,9 +487,14 @@ export function JournalGenerator({
                     onChange={setPickedModel}
                     disabled={isGenerating}
                   />
-                  <p className="hidden items-center gap-1 text-xs text-muted-foreground/80 md:flex">
+                  <p
+                    className={cn(
+                      "hidden items-center gap-1 text-xs text-muted-foreground/80 transition-opacity duration-300 md:flex",
+                      isApple === null && "opacity-0"
+                    )}
+                  >
                     <kbd className="rounded-md bg-muted px-1.5 py-0.5 font-sans">
-                      ⌘
+                      {isApple === false ? "Ctrl" : "⌘"}
                     </kbd>
                     <kbd className="rounded-md bg-muted px-1.5 py-0.5 font-sans">
                       ↵
