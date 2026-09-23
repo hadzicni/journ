@@ -40,8 +40,10 @@ export function buildSystemPrompt(options: EntryOptions) {
   ].join("\n\n");
 }
 
-// Ollama constrains the output to this JSON schema, so the entry always has
-// the expected shape. "language" comes first so it's known before the text.
+// The provider constrains the output to this JSON schema, so the entry always
+// has the expected shape. "language" comes first so it's known before the text.
+// It also satisfies OpenAI's strict mode: every property is required and no
+// others are allowed.
 export function entrySchema(options: EntryOptions) {
   return {
     type: "object",
@@ -55,6 +57,7 @@ export function entrySchema(options: EntryOptions) {
         : { text: { type: "string" } }),
     },
     required: ["language", options.format === "bullets" ? "items" : "text"],
+    additionalProperties: false,
   };
 }
 

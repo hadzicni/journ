@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 
 import { JournalEntry } from "@/components/journal-entry";
-import { ModelSelect, useOllamaModels } from "@/components/model-select";
+import { ModelSelect, useModels } from "@/components/model-select";
 import { SegmentedControl } from "@/components/segmented-control";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -122,10 +122,10 @@ export function JournalGenerator({ defaultModel }: { defaultModel?: string }) {
   const [format, setFormat] = useState<EntryFormat>("bullets");
   const [matchLanguage, setMatchLanguage] = useState(true);
 
-  const ollama = useOllamaModels();
+  const models = useModels();
   const [pickedModel, setPickedModel] = useState(defaultModel);
-  // Without OLLAMA_MODEL, fall back to the first installed model.
-  const model = pickedModel ?? ollama.models[0];
+  // Without a configured default model, fall back to the first available one.
+  const model = pickedModel ?? models.firstModel;
 
   // The user's edited Markdown; null while the entry is unedited.
   const [draft, setDraft] = useState<string | null>(null);
@@ -190,7 +190,7 @@ export function JournalGenerator({ defaultModel }: { defaultModel?: string }) {
           title: data.error ?? `Something went wrong (${res.status}).`,
           hint: data.hint,
         });
-        ollama.refresh();
+        models.refresh();
         return;
       }
 
@@ -215,9 +215,9 @@ export function JournalGenerator({ defaultModel }: { defaultModel?: string }) {
       console.error(err);
       setError({
         title: "Generation was interrupted.",
-        hint: "The connection to Ollama dropped before the entry was finished. Check that Ollama is still running and try again.",
+        hint: "The connection to the model dropped before the entry was finished. Check that your provider is still reachable and try again.",
       });
-      ollama.refresh();
+      models.refresh();
     } finally {
       if (abortRef.current === controller) abortRef.current = null;
       setIsGenerating(false);
@@ -342,7 +342,7 @@ export function JournalGenerator({ defaultModel }: { defaultModel?: string }) {
 
                 <div className="flex items-center gap-3 px-3 pt-1 pb-3 pl-5">
                   <ModelSelect
-                    state={ollama}
+                    state={models}
                     value={model}
                     onChange={setPickedModel}
                     disabled={isGenerating}

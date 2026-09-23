@@ -3,11 +3,12 @@ import { connection } from "next/server";
 import { JournalGenerator } from "@/components/journal-generator";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { TodayLabel } from "@/components/today-label";
+import { defaultModelId } from "@/lib/providers";
 
 export default async function Home() {
-  // Render per request so the default model matches the current OLLAMA_MODEL.
+  // Render per request so the default model matches the current env config.
   await connection();
-  const model = process.env.OLLAMA_MODEL;
+  const model = defaultModelId();
 
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-10 px-4 py-14 sm:py-24">
@@ -29,8 +30,8 @@ export default async function Home() {
           Journ
         </h1>
         <p className="max-w-md text-[1.0625rem] leading-relaxed text-pretty text-muted-foreground">
-          Jot down what you did today, however messy. A local model turns it
-          into a clean journal entry. Nothing is saved.
+          Jot down what you did today, however messy. A local or cloud model
+          turns it into a clean journal entry. Nothing is saved.
         </p>
       </header>
       <JournalGenerator defaultModel={model} />
