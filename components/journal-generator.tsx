@@ -10,12 +10,14 @@ import {
   DownloadIcon,
   LanguagesIcon,
   PencilIcon,
+  Redo2Icon,
   RotateCcwIcon,
   SparklesIcon,
   SquareIcon,
   Undo2Icon,
 } from "lucide-react";
 
+import { EntryDate } from "@/components/entry-date";
 import { JournalEntry } from "@/components/journal-entry";
 import { ModelSelect, useModels } from "@/components/model-select";
 import { SegmentedControl } from "@/components/segmented-control";
@@ -33,9 +35,14 @@ import {
   type EntryFormat,
   type EntryLength,
 } from "@/lib/entry";
+import { fromDay, toDay } from "@/lib/day";
 import { cn } from "@/lib/utils";
 
 type GenerationError = { title: string; hint?: string };
+
+// A generated entry: the model's raw output, when it was generated, and the
+// user's edits to it (null while unedited).
+type Version = { output: string; generatedAt: Date; draft: string | null };
 
 const PLACEHOLDER = `standup 9:30, fixed the login redirect bug finally
 lunch w/ sara at the thai place
@@ -75,14 +82,12 @@ async function writeToClipboard(text: string) {
 
 // Saves the entry as e.g. "journal-2026-09-23.md", named after its local date.
 function downloadMarkdown(markdown: string, date: Date) {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const day = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
   const url = URL.createObjectURL(
     new Blob([markdown], { type: "text/markdown;charset=utf-8" })
   );
   const link = document.createElement("a");
   link.href = url;
-  link.download = `journal-${day}.md`;
+  link.download = `journal-${toDay(date)}.md`;
   document.body.appendChild(link);
   link.click();
   link.remove();
@@ -142,6 +147,9 @@ export function JournalGenerator({
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<GenerationError | null>(null);
   const [copied, setCopied] = useState(false);
+  // The day the entry is for as "YYYY-MM-DD", or null for the day it's
+  // generated on.
+  const [entryDay, setEntryDay] = useState<string | null>(null);
 
   const [length, setLength] = useState<EntryLength>("concise");
   const [format, setFormat] = useState<EntryFormat>("bullets");
@@ -157,6 +165,10 @@ export function JournalGenerator({
   const [isEditing, setIsEditing] = useState(false);
   // Words only fly in for freshly generated text, not after editing.
   const [animateWords, setAnimateWords] = useState(true);
+  // The entry before the last regenerate, to switch back to. `undone` is
+  // true while it's the one shown, so the button offers to redo instead.
+  const [previous, setPrevious] = useState<Version | null>(null);
+  const [undone, setUndone] = useState(false);
 
   // Bumped whenever an entry finishes, to replay the shine across it.
   const [finishCount, setFinishCount] = useState(0);
@@ -209,9 +221,10 @@ export function JournalGenerator({
   }, []);
 
   // The model streams JSON; render whatever has arrived so far as Markdown.
+  const entryDate = entryDay ? fromDay(entryDay) : generatedAt;
   const entry = entryToMarkdown(
     toEntryData(parsePartialJson(output)),
-    generatedAt
+    entryDate
   );
   const finalEntry = draft ?? entry;
   const isEdited = draft !== null && draft !== entry;
@@ -219,6 +232,14 @@ export function JournalGenerator({
 
   async function generate() {
     if (!canGenerate) return;
+
+    // Keep the current entry, so a regenerate can be undone.
+    const before: Version | null = finalEntry
+      ? { output, generatedAt, draft }
+      : null;
+    setPrevious(before);
+    setUndone(false);
+    let received = "";
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -251,7 +272,6 @@ export function JournalGenerator({
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
-      let received = "";
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -278,6 +298,14 @@ export function JournalGenerator({
     } finally {
       if (abortRef.current === controller) abortRef.current = null;
       setIsGenerating(false);
+      // A regenerate that produced nothing brings back the entry it replaced.
+      if (before && !hasContent(toEntryData(parsePartialJson(received)))) {
+        setOutput(before.output);
+        setGeneratedAt(before.generatedAt);
+        setDraft(before.draft);
+        setAnimateWords(false);
+        setPrevious(null);
+      }
     }
   }
 
@@ -299,6 +327,19 @@ export function JournalGenerator({
   function revertEdits() {
     setDraft(null);
     setIsEditing(false);
+  }
+
+  // Swaps the shown entry with the one from before the last regenerate.
+  function toggleUndo() {
+    if (!previous) return;
+    setPrevious({ output, generatedAt, draft });
+    setOutput(previous.output);
+    setGeneratedAt(previous.generatedAt);
+    setDraft(previous.draft);
+    setAnimateWords(false);
+    setCopied(false);
+    setError(null);
+    setUndone(!undone);
   }
 
   // Fills in a random example, never the same one twice in a row.
@@ -374,6 +415,11 @@ export function JournalGenerator({
                 />
 
                 <div className="flex flex-wrap items-center gap-2 px-5 pt-1 pb-2">
+                  <EntryDate
+                    value={entryDay}
+                    onChange={setEntryDay}
+                    disabled={isGenerating}
+                  />
                   <SegmentedControl
                     name="Length"
                     value={length}
@@ -645,6 +691,33 @@ export function JournalGenerator({
                                   Regenerate
                                 </span>
                               </Button>
+                              {previous && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className={actionButton}
+                                  onClick={toggleUndo}
+                                  aria-label={
+                                    undone
+                                      ? "Redo regenerate"
+                                      : "Undo regenerate"
+                                  }
+                                  title={
+                                    undone
+                                      ? "Back to the regenerated entry"
+                                      : "Back to the previous entry"
+                                  }
+                                >
+                                  {undone ? (
+                                    <Redo2Icon data-icon="inline-start" />
+                                  ) : (
+                                    <Undo2Icon data-icon="inline-start" />
+                                  )}
+                                  <span className="hidden sm:inline">
+                                    {undone ? "Redo" : "Undo"}
+                                  </span>
+                                </Button>
+                              )}
                             </>
                           )}
                           <Button
@@ -652,7 +725,7 @@ export function JournalGenerator({
                             size="sm"
                             className={actionButton}
                             onClick={() =>
-                              downloadMarkdown(finalEntry, generatedAt)
+                              downloadMarkdown(finalEntry, entryDate)
                             }
                             aria-label="Download entry as Markdown"
                             title="Download as Markdown (.md)"
