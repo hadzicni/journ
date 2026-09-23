@@ -707,6 +707,10 @@ export function JournalGenerator({
                   </div>
                 </AutoHeight>
               </Card>
+              <p className="mt-3 px-6 text-center text-xs text-muted-foreground/80">
+                AI can make mistakes. Check the entry against your notes before
+                you keep it.
+              </p>
             </motion.div>
           )}
         </AnimatePresence>
