@@ -41,7 +41,7 @@ export function SegmentedControl<T extends string>({
           title={option.title}
           aria-label={option.title}
           className={cn(
-            "relative h-6 rounded-full! px-3 text-xs text-muted-foreground hover:bg-transparent aria-pressed:bg-transparent aria-pressed:text-foreground",
+            "relative h-6 cursor-pointer rounded-full! px-3 text-xs text-muted-foreground hover:bg-transparent aria-pressed:bg-transparent aria-pressed:text-foreground",
             itemClassName
           )}
         >
