@@ -281,6 +281,41 @@
   }
 }
 
+/* A soft band of light passes over the finished entry once. */
+.journ-shine {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+      110deg,
+      transparent 40%,
+      rgb(10 132 255 / 0.06) 50%,
+      transparent 60%
+    )
+    0 0 / 300% 100% no-repeat;
+  animation: journ-shine 1.6s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+.dark .journ-shine {
+  background-image: linear-gradient(
+    110deg,
+    transparent 40%,
+    rgb(255 255 255 / 0.07) 50%,
+    transparent 60%
+  );
+}
+
+@keyframes journ-shine {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+
 /* ---------- Page background, driven by <html data-generating> ---------- */
 
 /* Slow aurora of color behind everything; it wakes up while writing. */
@@ -292,9 +327,13 @@
   pointer-events: none;
   opacity: 0.22;
   scale: 1;
+  /* Drifts away from the mouse, set via --journ-mx/--journ-my (-1 to 1). */
+  translate: calc(var(--journ-mx, 0) * -1.5vmax)
+    calc(var(--journ-my, 0) * -1.5vmax);
   transition:
     opacity 1.2s ease,
-    scale 1.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+    scale 1.6s cubic-bezier(0.2, 0.8, 0.2, 1),
+    translate 2s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .journ-aurora > div {
@@ -366,8 +405,13 @@ html.dark[data-generating="true"] .journ-aurora {
   .journ-caret,
   .journ-shimmer,
   .journ-skeleton,
+  .journ-shine,
   .journ-aurora > div,
   .journ-aurora span {
     animation: none;
+  }
+
+  .journ-shine {
+    display: none;
   }
 }

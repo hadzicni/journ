@@ -19,6 +19,7 @@ import {
 import { JournalEntry } from "@/components/journal-entry";
 import { ModelSelect, useModels } from "@/components/model-select";
 import { SegmentedControl } from "@/components/segmented-control";
+import { Tilt } from "@/components/tilt";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -157,6 +158,9 @@ export function JournalGenerator({
   // Words only fly in for freshly generated text, not after editing.
   const [animateWords, setAnimateWords] = useState(true);
 
+  // Bumped whenever an entry finishes, to replay the shine across it.
+  const [finishCount, setFinishCount] = useState(0);
+
   const notesRef = useRef<HTMLTextAreaElement>(null);
   const lastExample = useRef(-1);
   const abortRef = useRef<AbortController | null>(null);
@@ -178,6 +182,31 @@ export function JournalGenerator({
       delete root.dataset.generating;
     };
   }, [isGenerating]);
+
+  // The page background aurora drifts away from the mouse.
+  useEffect(() => {
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const root = document.documentElement;
+    let frame = 0;
+    const onMove = (e: PointerEvent) => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        root.style.setProperty(
+          "--journ-mx",
+          String((e.clientX / innerWidth) * 2 - 1)
+        );
+        root.style.setProperty(
+          "--journ-my",
+          String((e.clientY / innerHeight) * 2 - 1)
+        );
+      });
+    };
+    window.addEventListener("pointermove", onMove);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      cancelAnimationFrame(frame);
+    };
+  }, []);
 
   // The model streams JSON; render whatever has arrived so far as Markdown.
   const entry = entryToMarkdown(
@@ -235,6 +264,8 @@ export function JournalGenerator({
           title: "The model returned an empty entry.",
           hint: "Try generating again, or add a bit more detail to your notes.",
         });
+      } else {
+        setFinishCount((count) => count + 1);
       }
     } catch (err) {
       if (controller.signal.aborted) return;
@@ -441,7 +472,7 @@ export function JournalGenerator({
                       type="submit"
                       size="lg"
                       disabled={!isGenerating && !canGenerate}
-                      className="relative h-10 min-w-30 overflow-hidden rounded-full px-5 text-[0.9375rem] transition-[scale,opacity,background-color] duration-200 active:scale-[0.96]"
+                      className="relative h-10 min-w-30 overflow-hidden rounded-full px-5 text-[0.9375rem] transition-[scale,opacity,background-color,box-shadow] duration-200 hover:shadow-[0_4px_16px_-4px_rgb(0_0_0/0.3)] active:scale-[0.96] disabled:shadow-none"
                     >
                       <AnimatePresence mode="popLayout" initial={false}>
                         <motion.span
@@ -521,192 +552,219 @@ export function JournalGenerator({
               }}
               transition={{ type: "spring", bounce: 0.35, duration: 0.9 }}
             >
-              <Card
-                aria-busy={isGenerating}
-                className="gap-0 rounded-[28px] py-0 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_12px_40px_-16px_rgb(0_0_0/0.18)] ring-black/6 dark:ring-white/10"
-              >
-                <div className="flex min-h-14 items-center justify-between gap-3 px-6 pt-4">
-                  <AnimatePresence mode="popLayout" initial={false}>
-                    <motion.span
-                      key={
-                        isGenerating ? "writing" : isEdited ? "edited" : "done"
-                      }
-                      {...swap}
-                      className={cn(
-                        "text-sm font-medium whitespace-nowrap",
-                        isGenerating
-                          ? "journ-shimmer"
-                          : "text-muted-foreground"
-                      )}
-                    >
-                      {isGenerating
-                        ? "Writing your entry…"
-                        : isEdited
-                          ? "Journal entry · Edited"
-                          : "Journal entry"}
-                    </motion.span>
-                  </AnimatePresence>
-
-                  <AnimatePresence>
-                    {!isGenerating && entry && (
-                      <motion.div
-                        key="actions"
-                        initial={{ opacity: 0, x: 8, filter: "blur(4px)" }}
-                        animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
-                        exit={{ opacity: 0, x: 8, filter: "blur(4px)" }}
-                        transition={{ ...spring, delay: 0.15 }}
-                        className="flex items-center gap-1"
+              <Tilt disabled={isEditing} className="rounded-[28px]">
+                <Card
+                  aria-busy={isGenerating}
+                  className="relative gap-0 rounded-[28px] py-0 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_12px_40px_-16px_rgb(0_0_0/0.18)] ring-black/6 dark:ring-white/10"
+                >
+                  <div className="flex min-h-14 items-center justify-between gap-3 px-6 pt-4">
+                    <AnimatePresence mode="popLayout" initial={false}>
+                      <motion.span
+                        key={
+                          isGenerating
+                            ? "writing"
+                            : isEdited
+                              ? "edited"
+                              : "done"
+                        }
+                        {...swap}
+                        className={cn(
+                          "text-sm font-medium whitespace-nowrap",
+                          isGenerating
+                            ? "journ-shimmer"
+                            : "text-muted-foreground"
+                        )}
                       >
-                        {isEditing ? (
-                          <>
-                            {isEdited && (
+                        {isGenerating
+                          ? "Writing your entry…"
+                          : isEdited
+                            ? "Journal entry · Edited"
+                            : "Journal entry"}
+                      </motion.span>
+                    </AnimatePresence>
+
+                    <AnimatePresence>
+                      {!isGenerating && entry && (
+                        <motion.div
+                          key="actions"
+                          initial={{ opacity: 0, x: 8, filter: "blur(4px)" }}
+                          animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
+                          exit={{ opacity: 0, x: 8, filter: "blur(4px)" }}
+                          transition={{ ...spring, delay: 0.15 }}
+                          className="flex items-center gap-1"
+                        >
+                          {isEditing ? (
+                            <>
+                              {isEdited && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className={actionButton}
+                                  onClick={revertEdits}
+                                  aria-label="Revert edits"
+                                >
+                                  <Undo2Icon data-icon="inline-start" />
+                                  <span className="hidden sm:inline">
+                                    Revert
+                                  </span>
+                                </Button>
+                              )}
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 className={actionButton}
-                                onClick={revertEdits}
-                                aria-label="Revert edits"
+                                onClick={finishEditing}
+                                aria-label="Done editing"
                               >
-                                <Undo2Icon data-icon="inline-start" />
-                                <span className="hidden sm:inline">Revert</span>
+                                <CheckIcon data-icon="inline-start" />
+                                <span className="hidden sm:inline">Done</span>
                               </Button>
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className={actionButton}
-                              onClick={finishEditing}
-                              aria-label="Done editing"
-                            >
-                              <CheckIcon data-icon="inline-start" />
-                              <span className="hidden sm:inline">Done</span>
-                            </Button>
-                          </>
-                        ) : (
-                          <>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className={actionButton}
-                              onClick={startEditing}
-                              aria-label="Edit entry"
-                            >
-                              <PencilIcon data-icon="inline-start" />
-                              <span className="hidden sm:inline">Edit</span>
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className={actionButton}
-                              onClick={generate}
-                              disabled={!canGenerate}
-                              aria-label="Regenerate entry"
-                            >
-                              <RotateCcwIcon data-icon="inline-start" />
-                              <span className="hidden sm:inline">
-                                Regenerate
-                              </span>
-                            </Button>
-                          </>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className={actionButton}
-                          onClick={() =>
-                            downloadMarkdown(finalEntry, generatedAt)
-                          }
-                          aria-label="Download entry as Markdown"
-                          title="Download as Markdown (.md)"
-                        >
-                          <DownloadIcon data-icon="inline-start" />
-                          <span className="hidden sm:inline">Download</span>
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          className="h-8 min-w-22 overflow-hidden rounded-full px-3 active:scale-[0.96]"
-                          onClick={copy}
-                          aria-live="polite"
-                        >
-                          <AnimatePresence mode="popLayout" initial={false}>
-                            <motion.span
-                              key={copied ? "copied" : "copy"}
-                              initial={{ opacity: 0, scale: 0.6, filter: "blur(4px)" }}
-                              animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
-                              exit={{ opacity: 0, scale: 0.6, filter: "blur(4px)" }}
-                              transition={{ type: "spring", bounce: 0.35, duration: 0.4 }}
-                              className="flex items-center gap-1.5"
-                            >
-                              {copied ? (
-                                <CheckIcon className="size-3.5 text-green-600 dark:text-green-500" />
-                              ) : (
-                                <CopyIcon className="size-3.5" />
-                              )}
-                              {copied ? "Copied" : "Copy"}
-                            </motion.span>
-                          </AnimatePresence>
-                        </Button>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-
-                <AutoHeight>
-                  <div className="px-6 pt-3 pb-7">
-                    <AnimatePresence mode="popLayout" initial={false}>
-                      {isEditing ? (
-                        <motion.div
-                          key="editor"
-                          initial={{ opacity: 0, filter: "blur(4px)" }}
-                          animate={{ opacity: 1, filter: "blur(0px)" }}
-                          exit={{ opacity: 0, filter: "blur(4px)" }}
-                          transition={spring}
-                        >
-                          <label htmlFor="entry-editor" className="sr-only">
-                            Edit journal entry (Markdown)
-                          </label>
-                          <Textarea
-                            id="entry-editor"
-                            value={draft ?? ""}
-                            onChange={(e) => setDraft(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Escape") finishEditing();
-                            }}
-                            autoFocus
-                            className="min-h-40 resize-none rounded-2xl border-0 bg-muted/60 p-4 font-mono text-[0.8125rem] leading-6 focus-visible:ring-2 md:text-[0.8125rem] dark:bg-muted/40"
-                          />
-                        </motion.div>
-                      ) : finalEntry ? (
-                        <motion.div
-                          key="entry"
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                        >
-                          <JournalEntry
-                            markdown={finalEntry}
-                            streaming={isGenerating}
-                            animate={animateWords}
-                          />
-                        </motion.div>
-                      ) : (
-                        <motion.div
-                          key="skeleton"
-                          className="space-y-3.5 py-1"
-                          exit={{ opacity: 0, filter: "blur(4px)" }}
-                          transition={spring}
-                          aria-hidden
-                        >
-                          <div className="journ-skeleton h-6 w-2/5 rounded-full" />
-                          <div className="journ-skeleton h-4 w-full rounded-full" />
-                          <div className="journ-skeleton h-4 w-11/12 rounded-full" />
-                          <div className="journ-skeleton h-4 w-3/5 rounded-full" />
+                            </>
+                          ) : (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className={actionButton}
+                                onClick={startEditing}
+                                aria-label="Edit entry"
+                              >
+                                <PencilIcon data-icon="inline-start" />
+                                <span className="hidden sm:inline">Edit</span>
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className={actionButton}
+                                onClick={generate}
+                                disabled={!canGenerate}
+                                aria-label="Regenerate entry"
+                              >
+                                <RotateCcwIcon data-icon="inline-start" />
+                                <span className="hidden sm:inline">
+                                  Regenerate
+                                </span>
+                              </Button>
+                            </>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className={actionButton}
+                            onClick={() =>
+                              downloadMarkdown(finalEntry, generatedAt)
+                            }
+                            aria-label="Download entry as Markdown"
+                            title="Download as Markdown (.md)"
+                          >
+                            <DownloadIcon data-icon="inline-start" />
+                            <span className="hidden sm:inline">Download</span>
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            className="h-8 min-w-22 overflow-hidden rounded-full px-3 active:scale-[0.96]"
+                            onClick={copy}
+                            aria-live="polite"
+                          >
+                            <AnimatePresence mode="popLayout" initial={false}>
+                              <motion.span
+                                key={copied ? "copied" : "copy"}
+                                initial={{
+                                  opacity: 0,
+                                  scale: 0.6,
+                                  filter: "blur(4px)",
+                                }}
+                                animate={{
+                                  opacity: 1,
+                                  scale: 1,
+                                  filter: "blur(0px)",
+                                }}
+                                exit={{
+                                  opacity: 0,
+                                  scale: 0.6,
+                                  filter: "blur(4px)",
+                                }}
+                                transition={{
+                                  type: "spring",
+                                  bounce: 0.35,
+                                  duration: 0.4,
+                                }}
+                                className="flex items-center gap-1.5"
+                              >
+                                {copied ? (
+                                  <CheckIcon className="size-3.5 text-green-600 dark:text-green-500" />
+                                ) : (
+                                  <CopyIcon className="size-3.5" />
+                                )}
+                                {copied ? "Copied" : "Copy"}
+                              </motion.span>
+                            </AnimatePresence>
+                          </Button>
                         </motion.div>
                       )}
                     </AnimatePresence>
                   </div>
-                </AutoHeight>
-              </Card>
+
+                  <AutoHeight>
+                    <div className="px-6 pt-3 pb-7">
+                      <AnimatePresence mode="popLayout" initial={false}>
+                        {isEditing ? (
+                          <motion.div
+                            key="editor"
+                            initial={{ opacity: 0, filter: "blur(4px)" }}
+                            animate={{ opacity: 1, filter: "blur(0px)" }}
+                            exit={{ opacity: 0, filter: "blur(4px)" }}
+                            transition={spring}
+                          >
+                            <label htmlFor="entry-editor" className="sr-only">
+                              Edit journal entry (Markdown)
+                            </label>
+                            <Textarea
+                              id="entry-editor"
+                              value={draft ?? ""}
+                              onChange={(e) => setDraft(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Escape") finishEditing();
+                              }}
+                              autoFocus
+                              className="min-h-40 resize-none rounded-2xl border-0 bg-muted/60 p-4 font-mono text-[0.8125rem] leading-6 focus-visible:ring-2 md:text-[0.8125rem] dark:bg-muted/40"
+                            />
+                          </motion.div>
+                        ) : finalEntry ? (
+                          <motion.div
+                            key="entry"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                          >
+                            <JournalEntry
+                              markdown={finalEntry}
+                              streaming={isGenerating}
+                              animate={animateWords}
+                            />
+                          </motion.div>
+                        ) : (
+                          <motion.div
+                            key="skeleton"
+                            className="space-y-3.5 py-1"
+                            exit={{ opacity: 0, filter: "blur(4px)" }}
+                            transition={spring}
+                            aria-hidden
+                          >
+                            <div className="journ-skeleton h-6 w-2/5 rounded-full" />
+                            <div className="journ-skeleton h-4 w-full rounded-full" />
+                            <div className="journ-skeleton h-4 w-11/12 rounded-full" />
+                            <div className="journ-skeleton h-4 w-3/5 rounded-full" />
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  </AutoHeight>
+                </Card>
+                {finishCount > 0 && (
+                  <div key={finishCount} className="journ-shine" aria-hidden />
+                )}
+              </Tilt>
               <p className="mt-3 px-6 text-center text-xs text-muted-foreground/80">
                 AI can make mistakes. Check the entry against your notes before
                 you keep it.
