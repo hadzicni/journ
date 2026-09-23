@@ -25,6 +25,7 @@ import {
 
 import { EntryDate } from "@/components/entry-date";
 import { JournalEntry } from "@/components/journal-entry";
+import { Onboarding } from "@/components/onboarding";
 import { ModelSelect, useModels } from "@/components/model-select";
 import { SegmentedControl } from "@/components/segmented-control";
 import { Tilt } from "@/components/tilt";
@@ -395,6 +396,10 @@ export function JournalGenerator({
 
   return (
     <MotionConfig reducedMotion="user">
+      <Onboarding
+        isApple={isApple}
+        onTryExample={examples.length > 0 ? tryExample : undefined}
+      />
       <div className="flex flex-col gap-6">
         <motion.div
           initial={{ opacity: 0, y: 16, filter: "blur(8px)" }}
