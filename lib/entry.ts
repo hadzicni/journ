@@ -25,9 +25,11 @@ export const LANGUAGES = [
   "uk", "ar", "he", "hi", "ja", "ko", "zh", "id", "vi", "th",
 ] as const;
 
+type Language = (typeof LANGUAGES)[number];
+
 // Section headings per language. Noun phrases where a verb would need a
-// gendered form (e.g. Polish, Croatian).
-const HEADINGS: Record<string, Record<Section, string>> = {
+// gendered form (e.g. Polish, Czech, Russian).
+const HEADINGS: Record<Language, Record<Section, string>> = {
   en: { done: "What I did", feelings: "How I felt", plans: "Plans" },
   de: { done: "Was ich gemacht habe", feelings: "Wie es mir ging", plans: "Pläne" },
   fr: { done: "Ce que j'ai fait", feelings: "Mon ressenti", plans: "À venir" },
@@ -38,11 +40,30 @@ const HEADINGS: Record<string, Record<Section, string>> = {
   sv: { done: "Vad jag gjorde", feelings: "Hur jag mådde", plans: "Planer" },
   da: { done: "Hvad jeg lavede", feelings: "Hvordan jeg havde det", plans: "Planer" },
   no: { done: "Hva jeg gjorde", feelings: "Hvordan jeg hadde det", plans: "Planer" },
+  fi: { done: "Mitä tein", feelings: "Miltä tuntui", plans: "Suunnitelmat" },
   pl: { done: "Mój dzień", feelings: "Samopoczucie", plans: "Plany" },
+  cs: { done: "Můj den", feelings: "Pocity", plans: "Plány" },
+  sk: { done: "Môj deň", feelings: "Pocity", plans: "Plány" },
+  sl: { done: "Moj dan", feelings: "Občutki", plans: "Načrti" },
   hr: { done: "Moj dan", feelings: "Osjećaji", plans: "Planovi" },
   sr: { done: "Moj dan", feelings: "Osećanja", plans: "Planovi" },
   bs: { done: "Moj dan", feelings: "Osjećaji", plans: "Planovi" },
+  hu: { done: "Mit csináltam", feelings: "Hogy éreztem magam", plans: "Tervek" },
+  ro: { done: "Ce am făcut", feelings: "Cum m-am simțit", plans: "Planuri" },
+  bg: { done: "Какво направих", feelings: "Как се чувствах", plans: "Планове" },
+  el: { done: "Τι έκανα", feelings: "Πώς ένιωσα", plans: "Σχέδια" },
   tr: { done: "Neler yaptım", feelings: "Nasıl hissettim", plans: "Planlar" },
+  ru: { done: "Мой день", feelings: "Чувства", plans: "Планы" },
+  uk: { done: "Мій день", feelings: "Почуття", plans: "Плани" },
+  ar: { done: "ما قمت به", feelings: "مشاعري", plans: "خططي" },
+  he: { done: "מה עשיתי", feelings: "איך הרגשתי", plans: "תוכניות" },
+  hi: { done: "मैंने क्या किया", feelings: "मेरी भावनाएँ", plans: "योजनाएँ" },
+  ja: { done: "やったこと", feelings: "気持ち", plans: "予定" },
+  ko: { done: "한 일", feelings: "기분", plans: "계획" },
+  zh: { done: "做了什么", feelings: "心情", plans: "计划" },
+  id: { done: "Yang saya lakukan", feelings: "Perasaan saya", plans: "Rencana" },
+  vi: { done: "Những việc tôi đã làm", feelings: "Cảm xúc", plans: "Kế hoạch" },
+  th: { done: "สิ่งที่ทำ", feelings: "ความรู้สึก", plans: "แผน" },
 };
 
 // Parses JSON that may still be streaming in, by closing whatever is open.
@@ -170,7 +191,7 @@ function formatDate(date: Date, language: string) {
 
 export function entryToMarkdown(data: EntryData, date: Date) {
   const language = data.language?.toLowerCase().slice(0, 2) || "en";
-  const headings = HEADINGS[language] ?? HEADINGS.en;
+  const headings = HEADINGS[language as Language] ?? HEADINGS.en;
 
   const sections = SECTIONS.flatMap((section) => {
     const body = sectionBody(data[section]);
